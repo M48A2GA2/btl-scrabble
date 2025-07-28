@@ -21,6 +21,10 @@ private:
     TextRenderer textRenderer;
     size_t currentPlayer;
 
+    int selectedTileIndex;
+    bool isDragging;
+    int mouseX, mouseY;
+
     static const int WINDOW_WIDTH = 1000;
     static const int WINDOW_HEIGHT = 700;
     static const int CELL_SIZE = 35;
@@ -34,17 +38,25 @@ public:
     bool initialize();
     void run();
     void handleEvents();
+    void handleMouseRelease(int x, int y);
+    void handleMouseClick(int x, int y);
     void update();
     void render();
     void renderBoard();
     void renderPlayerHand();
     void renderGameInfo();
+    void renderDraggedTile();
     void cleanup();
 
 private:
     void initializePlayers();
     void dealInitialTiles();
     SDL_Color getPremiumSquareColor(Board::Premium premium);
+
+    int getTileIndexAtPosition(int x, int y);
+    bool getBoardPosition(int x, int y, int &row, int &col);
+    bool isPositionOnBoard(int x, int y);
+    bool isPositionInHand(int x, int y);
 };
 
 #endif
