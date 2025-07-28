@@ -1,0 +1,50 @@
+#ifndef GAME_H
+#define GAME_H
+
+#include <SDL2/SDL.h>
+#include "Board.h"
+#include "Player.h"
+#include "TileBag.h"
+#include "TextRenderer.h"
+#include <memory>
+#include <vector>
+
+class Game
+{
+private:
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    bool running;
+    Board board;
+    std::vector<Player> players;
+    TileBag tileBag;
+    TextRenderer textRenderer;
+    size_t currentPlayer;
+
+    static const int WINDOW_WIDTH = 1000;
+    static const int WINDOW_HEIGHT = 700;
+    static const int CELL_SIZE = 35;
+    static const int BOARD_START_X = 50;
+    static const int BOARD_START_Y = 50;
+
+public:
+    Game();
+    ~Game();
+
+    bool initialize();
+    void run();
+    void handleEvents();
+    void update();
+    void render();
+    void renderBoard();
+    void renderPlayerHand();
+    void renderGameInfo();
+    void cleanup();
+
+private:
+    void initializePlayers();
+    void dealInitialTiles();
+    SDL_Color getPremiumSquareColor(Board::Premium premium);
+};
+
+#endif
