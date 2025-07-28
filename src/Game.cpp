@@ -130,40 +130,155 @@ void Game::handleMouseClick(int x, int y)
     }
 }
 
+// void Game::handleMouseRelease(int x, int y)
+// {
+//     // if (isDragging && selectedTileIndex != -1)
+//     // {
+//     //     // isDragging = false;
+//     //     int row, col;
+//     //     if (getBoardPosition(x, y, row, col))
+//     //     {
+//     //         auto tile = players[currentPlayer].removeTile(selectedTileIndex);
+//     //         if (tile && board.placeTile(row, col, std::move(tile)))
+//     //         {
+//     //             std::cout << "Placed tile on board: " << tile->letter << std::endl;
+//     //             if (!tileBag.isEmpty() && players[currentPlayer].hasEmptySlots())
+//     //             {
+//     //                 players[currentPlayer].addTile(tileBag.drawTile());
+//     //             }
+//     //         }
+//     //         else
+//     //         {
+//     //             if (tile)
+//     //             {
+//     //                 players[currentPlayer].addTile(std::move(tile)); // Return tile to hand if placement failed
+//     //                 std::cout << "Failed to place tile on board, returning to hand." << std::endl;
+//     //             }
+//     //             std::cout << "No tile selected." << std::endl;
+
+//     //             // std::cout << "Failed to place tile on board." << std::endl;
+//     //         }
+//     //     }
+//     //     selectedTileIndex = -1; // Reset selection
+//     // }
+
+//     if (isDragging && selectedTileIndex != -1)
+//     {
+//         int row, col;
+//         if (getBoardPosition(x, y, row, col))
+//         {
+//             // Try to place the tile on the board
+//             auto tile = players[currentPlayer].removeTile(selectedTileIndex);
+//             if (tile && board.placeTile(row, col, std::move(tile)))
+//             {
+//                 std::cout << "Placed tile at (" << row << ", " << col << ")" << std::endl;
+
+//                 // Draw a new tile if available
+//                 if (!tileBag.isEmpty() && players[currentPlayer].hasEmptySlots())
+//                 {
+//                     players[currentPlayer].addTile(tileBag.drawTile());
+//                 }
+//             }
+//             else
+//             {
+//                 // Return tile to hand if placement failed
+//                 if (tile)
+//                 {
+//                     players[currentPlayer].addTile(std::move(tile));
+//                 }
+//                 std::cout << "Cannot place tile there!" << std::endl;
+//             }
+//         }
+//     }
+
+//     selectedTileIndex = -1; // Reset selection
+//     isDragging = false;
+// }
+
 void Game::handleMouseRelease(int x, int y)
 {
     if (isDragging && selectedTileIndex != -1)
     {
-        // isDragging = false;
         int row, col;
         if (getBoardPosition(x, y, row, col))
         {
-            auto tile = players[currentPlayer].removeTile(selectedTileIndex);
-            if (tile && board.placeTile(row, col, std::move(tile)))
+            // Validate the move before placing
+            if (isValidMove(row, col))
             {
-                std::cout << "Placed tile on board: " << tile->letter << std::endl;
-                if (!tileBag.isEmpty() && players[currentPlayer].hasEmptySlots())
+                auto tile = players[currentPlayer].removeTile(selectedTileIndex);
+                if (tile && board.placeTile(row, col, std::move(tile)))
                 {
-                    players[currentPlayer].addTile(tileBag.drawTile());
+                    // Validate words formed
+                    if (validateWordsFormed(row, col))
+                    {
+                        std::cout << "Valid move! Placed tile at (" << row << ", " << col << ")" << std::endl;
+
+                        // Draw a new tile if available
+                        if (!tileBag.isEmpty() && players[currentPlayer].hasEmptySlots())
+                        {
+                            players[currentPlayer].addTile(tileBag.drawTile());
+                        }
+                    }
+                    else
+                    {
+                        // Invalid words formed - remove tile and return to hand
+                        auto placedTile = std::move(board.getSquare(row, col).tile);
+                        board.getSquare(row, col).tile = nullptr;
+                        players[currentPlayer].addTile(std::move(placedTile));
+                        std::cout << "Invalid words formed!" << std::endl;
+                    }
+                }
+                else
+                {
+                    // Return tile to hand if placement failed
+                    if (tile)
+                    {
+                        players[currentPlayer].addTile(std::move(tile));
+                    }
                 }
             }
             else
             {
-                if (tile)
-                {
-                    players[currentPlayer].addTile(std::move(tile)); // Return tile to hand if placement failed
-                    std::cout << "Failed to place tile on board, returning to hand." << std::endl;
-                }
-                std::cout << "No tile selected." << std::endl;
-
-                // std::cout << "Failed to place tile on board." << std::endl;
+                std::cout << "Invalid move! Check placement rules." << std::endl;
             }
         }
-        selectedTileIndex = -1; // Reset selection
     }
 
-    selectedTileIndex = -1; // Reset selection
+    // Reset dragging state
+    selectedTileIndex = -1;
     isDragging = false;
+}
+
+bool Game::isValidMove(int row, int col) const
+{
+    return board.canPlaceTile(row, col);
+}
+
+bool Game::validateWordsFormed(int row, int col) const
+{
+    auto words = board.getWordsFormedByMove(row, col);
+
+    // Single tiles don't form words unless it's the first move
+    if (words.empty() && board.isFirstMovePlayed())
+    {
+        return false; // Must form at least one word after first move
+    }
+
+    // Check all formed words against dictionary
+    for (const auto &word : words)
+    {
+        if (!dictionary.isValidWord(word))
+        {
+            std::cout << "Invalid word: " << word << std::endl;
+            return false;
+        }
+        else
+        {
+            std::cout << "Valid word: " << word << std::endl;
+        }
+    }
+
+    return true;
 }
 
 int Game::getTileIndexAtPosition(int x, int y)
@@ -380,7 +495,7 @@ void Game::renderPlayerHand()
         std::string pointsStr = std::to_string(hand[i]->points);
         textRenderer.renderText(pointsStr, x + CELL_SIZE - 15, y + CELL_SIZE - 15, {0, 0, 0, 255});
 
-        i++;
+        // i++;
     }
 }
 

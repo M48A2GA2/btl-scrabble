@@ -8,6 +8,7 @@
 #include "TextRenderer.h"
 #include <memory>
 #include <vector>
+#include "Dictionary.h"
 
 class Game
 {
@@ -49,6 +50,7 @@ public:
     void cleanup();
 
 private:
+    Dictionary dictionary;
     void initializePlayers();
     void dealInitialTiles();
     SDL_Color getPremiumSquareColor(Board::Premium premium);
@@ -57,6 +59,8 @@ private:
     bool getBoardPosition(int x, int y, int &row, int &col);
     bool isPositionOnBoard(int x, int y);
     bool isPositionInHand(int x, int y);
+    bool isValidMove(int row, int col) const;
+    bool validateWordsFormed(int row, int col) const;
 };
 
 #endif
