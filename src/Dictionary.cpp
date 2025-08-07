@@ -2,11 +2,20 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
-#include <vector>
+#include <cctype>
 
 Dictionary::Dictionary()
 {
-    loadBasicWords(); // Load basic words as fallback
+    loadBasicWords();
+}
+
+Dictionary::Dictionary(const std::string &filename)
+{
+    if (!loadFromFile(filename))
+    {
+        std::cerr << "Failed to load dictionary from file, using basic words\n";
+        loadBasicWords();
+    }
 }
 
 bool Dictionary::loadFromFile(const std::string &filename)
@@ -14,30 +23,34 @@ bool Dictionary::loadFromFile(const std::string &filename)
     std::ifstream file(filename);
     if (!file.is_open())
     {
-        std::cerr << "Could not open dictionary file: " << filename << std::endl;
+        std::cerr << "Could not open dictionary file: " << filename << '\n';
         return false;
     }
 
     words.clear();
+    words.reserve(100000); // Reserve space for better performance
+
     std::string word;
     while (std::getline(file, word))
     {
-        // Convert to uppercase and add to set
-        std::transform(word.begin(), word.end(), word.begin(), ::toupper);
         if (!word.empty())
         {
-            words.insert(word);
+            // Remove any trailing whitespace
+            word.erase(word.find_last_not_of(" \t\r\n") + 1);
+            if (!word.empty())
+            {
+                words.insert(toUpperCase(word));
+            }
         }
     }
 
-    std::cout << "Loaded " << words.size() << " words from dictionary" << std::endl;
+    std::cout << "Loaded " << words.size() << " words from dictionary\n";
     return true;
 }
 
 void Dictionary::loadBasicWords()
 {
-    // Basic word list for testing - in a real game you'd load from a comprehensive dictionary file
-    std::vector<std::string> basicWords = {
+    constexpr std::string_view basicWords[] = {
         "CAT", "DOG", "HOUSE", "TREE", "BOOK", "GAME", "PLAY", "WORD", "TILE",
         "BOARD", "SCORE", "POINT", "LETTER", "PLACE", "MOVE", "TURN", "WIN",
         "LOSE", "DRAW", "HAND", "RACK", "BAG", "BLANK", "TRIPLE", "DOUBLE",
@@ -48,17 +61,33 @@ void Dictionary::loadBasicWords()
         "GO", "RUN", "WALK", "JUMP", "STOP", "LOOK", "SEE", "HEAR", "TALK", "SAY",
         "MAKE", "TAKE", "GIVE", "GET", "PUT", "COME", "WORK", "HELP", "FIND", "KNOW"};
 
+    words.clear();
+    words.reserve(std::size(basicWords));
+
     for (const auto &word : basicWords)
     {
-        words.insert(word);
+        words.emplace(word);
     }
 
-    std::cout << "Loaded " << words.size() << " basic words" << std::endl;
+    std::cout << "Loaded " << words.size() << " basic words\n";
 }
 
-bool Dictionary::isValidWord(const std::string &word) const
+bool Dictionary::isValidWord(std::string_view word) const
 {
-    std::string upperWord = word;
-    std::transform(upperWord.begin(), upperWord.end(), upperWord.begin(), ::toupper);
-    return words.find(upperWord) != words.end();
+    if (word.empty())
+        return false;
+    return words.find(toUpperCase(word)) != words.end();
+}
+
+std::string Dictionary::toUpperCase(std::string_view word)
+{
+    std::string result;
+    result.reserve(word.size());
+
+    for (char c : word)
+    {
+        result.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
+    }
+
+    return result;
 }

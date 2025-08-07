@@ -6,8 +6,9 @@
 #include "Player.h"
 #include "TileBag.h"
 #include "TextRenderer.h"
-#include <memory>
 #include <vector>
+#include <memory>
+#include <utility>
 #include "Dictionary.h"
 
 class Game
@@ -21,7 +22,6 @@ private:
     TileBag tileBag;
     TextRenderer textRenderer;
     size_t currentPlayer;
-
     int selectedTileIndex;
     bool isDragging;
     int mouseX, mouseY;
@@ -49,18 +49,41 @@ public:
     void renderDraggedTile();
     void cleanup();
 
+    // Add missing function declarations
+    bool validateCompleteWord(const std::vector<std::pair<int, int>> &positions);
+    bool validateCompleteMove(const std::vector<std::pair<int, int>> &positions);
+    bool tilesFormLine(const std::vector<std::pair<int, int>> &positions);
+    int calculateWordScore(const std::vector<std::pair<int, int>> &positions,
+                           const std::vector<std::unique_ptr<Tile>> &tiles);
+
 private:
     Dictionary dictionary;
-    void initializePlayers();
-    void dealInitialTiles();
     SDL_Color getPremiumSquareColor(Board::Premium premium);
 
+    void initializePlayers();
+    void dealInitialTiles();
+    void startWordPlacement();
+    void addTileToWord(int row, int col, int tileIndex);
+    bool canAddTileToWord(int row, int col) const;
+    void commitWord();
+    void cancelWordPlacement();
+    void renderPendingPlacements();
+    bool validateWordPlacement() const;
+    std::string getPremiumSquareText(Board::Premium premium);
+
+    std::vector<std::pair<int, int>> pendingPlacements;
+    std::vector<int> pendingTileIndices;
+    std::vector<std::string> getFormedWords() const;
+
+    int placementDirection;
     int getTileIndexAtPosition(int x, int y);
     bool getBoardPosition(int x, int y, int &row, int &col);
     bool isPositionOnBoard(int x, int y);
     bool isPositionInHand(int x, int y);
     bool isValidMove(int row, int col) const;
     bool validateWordsFormed(int row, int col) const;
+    bool isPlacingWord;
+    bool hasSetDirection;
 };
 
 #endif

@@ -4,6 +4,7 @@
 #include "Tile.h"
 #include <vector>
 #include <memory>
+#include <utility>
 #include <string>
 
 class Board
@@ -11,7 +12,7 @@ class Board
 public:
     static const int BOARD_SIZE = 15;
 
-    enum Premium 
+    enum Premium
     {
         NONE,
         DOUBLE_LETTER,
@@ -21,6 +22,16 @@ public:
         START
     };
 
+    struct WordInfo
+    {
+        std::string word;
+        std::vector<std::pair<int, int>> positions;
+        int score;
+        bool isMainWord;
+
+        WordInfo() : score(0), isMainWord(false) {}
+    };
+
     struct Square
     {
         std::unique_ptr<Tile> tile;
@@ -28,13 +39,15 @@ public:
 
         Square(Premium p = NONE) : premium(p) {}
 
-        // disable copy constructor 
+        // Disable copy constructor and assignment
         Square(const Square &) = delete;
         Square &operator=(const Square &) = delete;
+
+        // Enable move constructor and assignment
         Square(Square &&) = default;
         Square &operator=(Square &&) = default;
 
-        bool isOccupied() const { return tile != nullptr; }
+        bool isOccupied() const noexcept { return tile != nullptr; }
     };
 
 private:
@@ -43,20 +56,26 @@ private:
 
 public:
     Board();
+
     void initializePremiumSquares();
-    bool isInBounds(int row, int col) const;
+    bool isInBounds(int row, int col) const noexcept;
     Square &getSquare(int row, int col);
     const Square &getSquare(int row, int col) const;
     bool placeTile(int row, int col, std::unique_ptr<Tile> tile);
 
-    std::vector<std::string> getWordsFormedByMove(int row, int col) const;
+    // Fixed function signature
+    std::vector<WordInfo> getWordsFormedByMove(
+        const std::vector<std::pair<int, int>> &positions) const;
     std::string getWordInDirection(int row, int col, int deltaRow, int deltaCol) const;
-    bool isAdjacentToExistingTile(int row, int col) const;
-    bool isFirstMovePlayed() const { return firstMovePlayed; }
-    bool isValidFirstMove(int row, int col) const;
-    
-    // Temp placement for validation
-    bool canPlaceTile(int row, int col) const;
+    bool isAdjacentToExistingTile(int row, int col) const noexcept;
+    bool isFirstMovePlayed() const noexcept { return firstMovePlayed; }
+    bool isValidFirstMove(int row, int col) const noexcept;
+    bool canPlaceTile(int row, int col) const noexcept;
+
+    // Add missing functions
+    int calculateWordScore(const WordInfo &wordInfo) const;
+    Premium getPremium(int row, int col) const;
+    bool isEmpty() const noexcept;
 };
 
 #endif

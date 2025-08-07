@@ -4,21 +4,25 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <string>
-#include <memory>
+#include <vector>
+#include <unordered_map>
 
-class TextRenderer
-{
+class TextRenderer {
 private:
-    TTF_Font *font;
-    SDL_Renderer *renderer;
+    TTF_Font* font;
+    SDL_Renderer* renderer;
+    std::unordered_map<std::string, SDL_Texture *> textCache;
+    static const size_t MAX_CACHE_SIZE = 100;
 
 public:
-    TextRenderer(SDL_Renderer *renderer);
+    TextRenderer();  // Changed: no parameters
     ~TextRenderer();
-
-    bool initialize(const std::string &fontPath, int fontSize);
-    void renderText(const std::string &text, int x, int y, SDL_Color color = {255, 255, 255, 255});
-    void renderCenteredText(const std::string &text, int x, int y, int width, int height, SDL_Color color = {255, 255, 255, 255});
+    
+    bool initialize(SDL_Renderer* renderer, const std::string& fontPath, int fontSize);  // Changed: added renderer parameter
+    void renderText(const std::string& text, int x, int y, SDL_Color color = {255, 255, 255, 255});
+    void renderCenteredText(const std::string& text, int x, int y, int width, int height, SDL_Color color);
+    void renderCachedText(const std::string &text, int x, int y, SDL_Color color);
+    void clearCache();
 };
 
 #endif
