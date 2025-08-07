@@ -74,6 +74,11 @@ private:
     std::vector<std::pair<int, int>> pendingPlacements;
     std::vector<int> pendingTileIndices;
     std::vector<std::string> getFormedWords() const;
+std::string getMainWordFromPlacements() const;
+std::string getHorizontalWordAt(int row, int col, int tileIndex) const;
+std::string getVerticalWordAt(int row, int col, int tileIndex) const;
+std::string buildWordFromPosition(int row, int col, int deltaRow, int deltaCol, int newTileIndex = -1) const;
+
 
     int placementDirection;
     int getTileIndexAtPosition(int x, int y);

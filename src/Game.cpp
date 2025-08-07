@@ -46,7 +46,6 @@ bool Game::initialize()
         return false;
     }
 
-    // IMPORTANT: Initialize TextRenderer AFTER creating renderer
     // if (!textRenderer.initialize(renderer, "", 24)) {
     //     std::cerr << "Failed to initialize text renderer" << std::endl;
     //     return false;
@@ -554,7 +553,7 @@ void Game::renderDraggedTile()
 
 void Game::render()
 {
-    SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderClear(renderer);
 
     renderBoard();
@@ -876,18 +875,435 @@ std::vector<std::string> Game::getFormedWords() const
 {
     std::vector<std::string> words;
 
-    // For now, just create a simple word from pending tiles
-    if (!pendingPlacements.empty())
+    if (pendingPlacements.empty())
+        return words;
+
+    // Get the main word being placed
+    std::string mainWord = getMainWordFromPlacements();
+    if (mainWord.length() > 1)
     {
-        std::string word;
-        for (int tileIndex : pendingTileIndices)
-        {
-            word += players[currentPlayer].getHand()[tileIndex]->letter;
+        words.push_back(mainWord);
+    }
+
+    // Get cross-words formed by each new tile
+    for (size_t i = 0; i < pendingPlacements.size(); i++)
+    {
+        int row = pendingPlacements[i].first;
+        int col = pendingPlacements[i].second;
+
+        // Check perpendicular direction for cross-words
+        if (placementDirection == 0)
+        { // Horizontal main word
+            std::string crossWord = getVerticalWordAt(row, col, pendingTileIndices[i]);
+            if (crossWord.length() > 1)
+            {
+                words.push_back(crossWord);
+            }
         }
-        words.push_back(word);
+        else
+        { // Vertical main word
+            std::string crossWord = getHorizontalWordAt(row, col, pendingTileIndices[i]);
+            if (crossWord.length() > 1)
+            {
+                words.push_back(crossWord);
+            }
+        }
     }
 
     return words;
+}
+
+std::string Game::getMainWordFromPlacements() const
+{
+    if (pendingPlacements.empty())
+        return "";
+
+    // Sort placements to get word in order
+    auto sortedPlacements = pendingPlacements;
+    auto sortedIndices = pendingTileIndices;
+
+    // Sort both vectors together
+    for (size_t i = 0; i < sortedPlacements.size(); i++)
+    {
+        for (size_t j = i + 1; j < sortedPlacements.size(); j++)
+        {
+            bool shouldSwap = false;
+            if (placementDirection == 0)
+            { // Horizontal
+                shouldSwap = sortedPlacements[i].second > sortedPlacements[j].second;
+            }
+            else
+            { // Vertical
+                shouldSwap = sortedPlacements[i].first > sortedPlacements[j].first;
+            }
+
+            if (shouldSwap)
+            {
+                std::swap(sortedPlacements[i], sortedPlacements[j]);
+                std::swap(sortedIndices[i], sortedIndices[j]);
+            }
+        }
+    }
+
+    // Build complete word including existing tiles
+    std::string word;
+    if (placementDirection == 0)
+    { // Horizontal
+        int row = sortedPlacements[0].first;
+        int startCol = sortedPlacements[0].second;
+        int endCol = sortedPlacements.back().second;
+
+        // Find actual start of word (include existing tiles to the left)
+        while (startCol > 0 && board.getSquare(row, startCol - 1).isOccupied())
+        {
+            startCol--;
+        }
+
+        // Find actual end of word (include existing tiles to the right)
+        while (endCol < Board::BOARD_SIZE - 1 && board.getSquare(row, endCol + 1).isOccupied())
+        {
+            endCol++;
+        }
+
+        // Build the complete word
+        for (int col = startCol; col <= endCol; col++)
+        {
+            char letter = ' ';
+
+            // Check if this position has a pending tile
+            auto pendingIt = std::find(sortedPlacements.begin(), sortedPlacements.end(),
+                                       std::make_pair(row, col));
+            if (pendingIt != sortedPlacements.end())
+            {
+                int index = std::distance(sortedPlacements.begin(), pendingIt);
+                letter = players[currentPlayer].getHand()[sortedIndices[index]]->getDisplayLetter();
+            }
+            else if (board.getSquare(row, col).isOccupied())
+            {
+                letter = board.getSquare(row, col).tile->getDisplayLetter();
+            }
+
+            if (letter != ' ')
+            {
+                word += letter;
+            }
+        }
+    }
+    else
+    { // Vertical - similar logic
+        int col = sortedPlacements[0].second;
+        int startRow = sortedPlacements[0].first;
+        int endRow = sortedPlacements.back().first;
+
+        // Find actual start of word
+        while (startRow > 0 && board.getSquare(startRow - 1, col).isOccupied())
+        {
+            startRow--;
+        }
+
+        // Find actual end of word
+        while (endRow < Board::BOARD_SIZE - 1 && board.getSquare(endRow + 1, col).isOccupied())
+        {
+            endRow++;
+        }
+
+        // Build the complete word
+        for (int row = startRow; row <= endRow; row++)
+        {
+            char letter = ' ';
+
+            auto pendingIt = std::find(sortedPlacements.begin(), sortedPlacements.end(),
+                                       std::make_pair(row, col));
+            if (pendingIt != sortedPlacements.end())
+            {
+                int index = std::distance(sortedPlacements.begin(), pendingIt);
+                letter = players[currentPlayer].getHand()[sortedIndices[index]]->getDisplayLetter();
+            }
+            else if (board.getSquare(row, col).isOccupied())
+            {
+                letter = board.getSquare(row, col).tile->getDisplayLetter();
+            }
+
+            if (letter != ' ')
+            {
+                word += letter;
+            }
+        }
+    }
+
+    return word;
+}
+
+std::string Game::getHorizontalWordAt(int row, int col, int tileIndex) const
+{
+    return buildWordFromPosition(row, col, 0, 1, tileIndex);
+}
+
+std::string Game::getVerticalWordAt(int row, int col, int tileIndex) const
+{
+    return buildWordFromPosition(row, col, 1, 0, tileIndex);
+}
+
+std::string Game::buildWordFromPosition(int row, int col, int deltaRow, int deltaCol, int newTileIndex) const
+{
+    // Find start of word
+    int startRow = row, startCol = col;
+    while (startRow - deltaRow >= 0 && startCol - deltaCol >= 0 &&
+           startRow - deltaRow < Board::BOARD_SIZE && startCol - deltaCol < Board::BOARD_SIZE)
+    {
+
+        bool hasExistingTile = board.getSquare(startRow - deltaRow, startCol - deltaCol).isOccupied();
+        bool hasPendingTile = std::find(pendingPlacements.begin(), pendingPlacements.end(),
+                                        std::make_pair(startRow - deltaRow, startCol - deltaCol)) != pendingPlacements.end();
+
+        if (!hasExistingTile && !hasPendingTile)
+            break;
+
+        startRow -= deltaRow;
+        startCol -= deltaCol;
+    }
+
+    // Build word from start
+    std::string word;
+    int currentRow = startRow, currentCol = startCol;
+
+    while (currentRow >= 0 && currentCol >= 0 &&
+           currentRow < Board::BOARD_SIZE && currentCol < Board::BOARD_SIZE)
+    {
+
+        char letter = ' ';
+
+        // Check if this is the new tile position
+        if (currentRow == row && currentCol == col && newTileIndex >= 0)
+        {
+            letter = players[currentPlayer].getHand()[newTileIndex]->getDisplayLetter();
+        }
+        // Check if there's a pending tile here
+        else
+        {
+            auto pendingIt = std::find(pendingPlacements.begin(), pendingPlacements.end(),
+                                       std::make_pair(currentRow, currentCol));
+            if (pendingIt != pendingPlacements.end())
+            {
+                int index = std::distance(pendingPlacements.begin(), pendingIt);
+                letter = players[currentPlayer].getHand()[pendingTileIndices[index]]->getDisplayLetter();
+            }
+            // Check if there's an existing tile
+            else if (board.getSquare(currentRow, currentCol).isOccupied())
+            {
+                letter = board.getSquare(currentRow, currentCol).tile->getDisplayLetter();
+            }
+        }
+
+        if (letter == ' ')
+            break;
+
+        word += letter;
+        currentRow += deltaRow;
+        currentCol += deltaCol;
+    }
+
+    return word;
+}
+
+bool Game::hasGapsInWordPlacement() const
+{
+    if (pendingPlacements.size() <= 1)
+        return false;
+
+    auto sortedPos = pendingPlacements;
+    std::sort(sortedPos.begin(), sortedPos.end());
+
+    if (placementDirection == 0)
+    { // Horizontal
+        int row = sortedPos[0].first;
+        for (int col = sortedPos[0].second; col <= sortedPos.back().second; ++col)
+        {
+            // Check if position has a tile (either placed or pending)
+            bool hasPlacedTile = board.getSquare(row, col).isOccupied();
+            bool hasPendingTile = std::find(pendingPlacements.begin(), pendingPlacements.end(),
+                                            std::make_pair(row, col)) != pendingPlacements.end();
+
+            if (!hasPlacedTile && !hasPendingTile)
+            {
+                std::cout << "Gap found at position (" << row << ", " << col << ")" << std::endl;
+                return true; // Gap found
+            }
+        }
+    }
+    else
+    { // Vertical
+        int col = sortedPos[0].second;
+        for (int row = sortedPos[0].first; row <= sortedPos.back().first; ++row)
+        {
+            bool hasPlacedTile = board.getSquare(row, col).isOccupied();
+            bool hasPendingTile = std::find(pendingPlacements.begin(), pendingPlacements.end(),
+                                            std::make_pair(row, col)) != pendingPlacements.end();
+
+            if (!hasPlacedTile && !hasPendingTile)
+            {
+                std::cout << "Gap found at position (" << row << ", " << col << ")" << std::endl;
+                return true; // Gap found
+            }
+        }
+    }
+
+    return false;
+}
+
+int Game::calculateCompleteWordScore(const std::vector<std::pair<int, int>> &positions)
+{
+    if (positions.empty())
+        return 0;
+
+    int totalScore = 0;
+
+    // Calculate main word score
+    int mainWordScore = 0;
+    int wordMultiplier = 1;
+
+    // Get the complete main word
+    std::string mainWord = getMainWordFromPlacements();
+
+    // Calculate score for each position in the main word
+    for (const auto &pos : positions)
+    {
+        int row = pos.first;
+        int col = pos.second;
+        auto &square = board.getSquare(row, col);
+
+        // Get tile points
+        int letterScore = 0;
+        auto pendingIt = std::find(pendingPlacements.begin(), pendingPlacements.end(), pos);
+        if (pendingIt != pendingPlacements.end())
+        {
+            int index = std::distance(pendingPlacements.begin(), pendingIt);
+            letterScore = players[currentPlayer].getHand()[pendingTileIndices[index]]->points;
+
+            // Apply premium squares only for newly placed tiles
+            switch (square.premium)
+            {
+            case Board::DOUBLE_LETTER:
+                letterScore *= 2;
+                std::cout << "Double letter score applied at (" << row << ", " << col << ")" << std::endl;
+                break;
+            case Board::TRIPLE_LETTER:
+                letterScore *= 3;
+                std::cout << "Triple letter score applied at (" << row << ", " << col << ")" << std::endl;
+                break;
+            case Board::DOUBLE_WORD:
+                wordMultiplier *= 2;
+                std::cout << "Double word score applied at (" << row << ", " << col << ")" << std::endl;
+                break;
+            case Board::TRIPLE_WORD:
+                wordMultiplier *= 3;
+                std::cout << "Triple word score applied at (" << row << ", " << col << ")" << std::endl;
+                break;
+            default:
+                break;
+            }
+        }
+
+        mainWordScore += letterScore;
+    }
+
+    // Apply word multiplier to main word
+    mainWordScore *= wordMultiplier;
+    totalScore += mainWordScore;
+
+    std::cout << "Main word '" << mainWord << "' scores " << mainWordScore << " points" << std::endl;
+
+    // Add cross-word scores
+    int crossWordScore = calculateCrossWordScores();
+    totalScore += crossWordScore;
+
+    // Bingo bonus: +50 points for using all 7 tiles
+    if (pendingPlacements.size() == 7)
+    {
+        totalScore += 50;
+        std::cout << "BINGO! +50 bonus points for using all tiles!" << std::endl;
+    }
+
+    return totalScore;
+}
+
+int Game::calculateCrossWordScores() const
+{
+    int totalCrossScore = 0;
+
+    for (size_t i = 0; i < pendingPlacements.size(); i++)
+    {
+        int row = pendingPlacements[i].first;
+        int col = pendingPlacements[i].second;
+
+        std::string crossWord;
+        int crossScore = 0;
+        int crossWordMultiplier = 1;
+
+        // Get cross-word in perpendicular direction
+        if (placementDirection == 0)
+        { // Main word is horizontal, check vertical
+            crossWord = getVerticalWordAt(row, col, pendingTileIndices[i]);
+        }
+        else
+        { // Main word is vertical, check horizontal
+            crossWord = getHorizontalWordAt(row, col, pendingTileIndices[i]);
+        }
+
+        // Only score cross-words that are longer than 1 letter
+        if (crossWord.length() > 1)
+        {
+            // Calculate cross-word score
+            std::vector<std::pair<int, int>> crossPositions;
+
+            // This is a simplified version - in a complete implementation,
+            // you'd need to get all positions of the cross-word
+            auto &square = board.getSquare(row, col);
+            int letterScore = players[currentPlayer].getHand()[pendingTileIndices[i]]->points;
+
+            // Apply premium squares
+            switch (square.premium)
+            {
+            case Board::DOUBLE_LETTER:
+                letterScore *= 2;
+                break;
+            case Board::TRIPLE_LETTER:
+                letterScore *= 3;
+                break;
+            case Board::DOUBLE_WORD:
+                crossWordMultiplier *= 2;
+                break;
+            case Board::TRIPLE_WORD:
+                crossWordMultiplier *= 3;
+                break;
+            default:
+                break;
+            }
+
+            // For simplicity, just add the new tile's contribution
+            // In a complete implementation, you'd calculate the full cross-word score
+            crossScore = letterScore * crossWordMultiplier;
+            totalCrossScore += crossScore;
+
+            std::cout << "Cross-word '" << crossWord << "' scores " << crossScore << " points" << std::endl;
+        }
+    }
+
+    return totalCrossScore;
+}
+
+int Game::getTilePoints(int row, int col) const
+{
+    if (!board.isInBounds(row, col))
+        return 0;
+
+    auto &square = board.getSquare(row, col);
+    if (square.isOccupied())
+    {
+        return square.tile->points;
+    }
+
+    return 0;
 }
 
 SDL_Color Game::getPremiumSquareColor(Board::Premium premium)
@@ -943,4 +1359,3 @@ void Game::cleanup()
     TTF_Quit();
     SDL_Quit();
 }
-
