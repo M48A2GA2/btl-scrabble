@@ -1,7 +1,7 @@
 # Scrabble Game - Bài Tập Lớn OOP
 
 ## Mô Tả
-Đây là game Scrabble được phát triển bằng C++ với thư viện SDL2 cho môn Lập Trình Hướng Đối Tượng.
+Đây là game Scrabble được phát triển bằng C++ với thư viện SDL2 cho môn Lập Trình Nâng Cao.
 
 ## Tính Năng
 - Giao diện đồ họa với SDL2
@@ -118,12 +118,6 @@ btl-scrabble-hieu/
 - Kiểm tra tính hợp lệ của từ
 - Tải từ điển từ file
 - Hỗ trợ từ điển cơ bản
-
-## Tác Giả
-- Sinh viên: [Tên sinh viên]
-- Lớp: [Tên lớp]
-- Môn: Lập Trình Nâng Cao
-- Năm: 2025
 
 ## License
 Dự án giáo dục - Chỉ dành cho mục đích học tập
