@@ -1,94 +1,118 @@
-#ifndef GAME_H
-#define GAME_H
+#pragma once
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
+#include <vector>
+#include <string>
 #include "Board.h"
 #include "Player.h"
 #include "TileBag.h"
 #include "TextRenderer.h"
-#include <vector>
-#include <memory>
-#include <utility>
 #include "Dictionary.h"
+
+const int WINDOW_WIDTH = 1024;
+const int WINDOW_HEIGHT = 768;
+const int CELL_SIZE = 40;
+const int BOARD_START_X = 50;
+const int BOARD_START_Y = 50;
+
+enum GameState
+{
+    PLAYER_SELECTION,
+    PLAYING,
+    GAME_OVER
+};
 
 class Game
 {
-private:
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    bool running;
-    Board board;
-    std::vector<Player> players;
-    TileBag tileBag;
-    TextRenderer textRenderer;
-    size_t currentPlayer;
-    int selectedTileIndex;
-    bool isDragging;
-    int mouseX, mouseY;
-
-    static const int WINDOW_WIDTH = 1000;
-    static const int WINDOW_HEIGHT = 700;
-    static const int CELL_SIZE = 35;
-    static const int BOARD_START_X = 50;
-    static const int BOARD_START_Y = 50;
-
 public:
     Game();
     ~Game();
 
     bool initialize();
     void run();
-    void handleEvents();
-    void handleMouseRelease(int x, int y);
-    void handleMouseClick(int x, int y);
-    void update();
-    void render();
-    void renderBoard();
-    void renderPlayerHand();
-    void renderGameInfo();
-    void renderDraggedTile();
     void cleanup();
 
-    // Add missing function declarations
-    bool validateCompleteWord(const std::vector<std::pair<int, int>> &positions);
-    bool validateCompleteMove(const std::vector<std::pair<int, int>> &positions);
-    bool tilesFormLine(const std::vector<std::pair<int, int>> &positions);
-    int calculateWordScore(const std::vector<std::pair<int, int>> &positions,
-                           const std::vector<std::unique_ptr<Tile>> &tiles);
-
 private:
+    // SDL components
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    TextRenderer textRenderer;
+
+    // Game state
+    GameState gameState;
+    bool running;
+    int playerCount;
+
+    // Game components
+    Board board;
+    std::vector<Player> players;
+    TileBag tileBag;
     Dictionary dictionary;
-    SDL_Color getPremiumSquareColor(Board::Premium premium);
+    int currentPlayer;
 
-    void initializePlayers();
-    void dealInitialTiles();
-    void startWordPlacement();
-    void addTileToWord(int row, int col, int tileIndex);
-    bool canAddTileToWord(int row, int col) const;
-    void commitWord();
-    void cancelWordPlacement();
-    void renderPendingPlacements();
-    bool validateWordPlacement() const;
-    std::string getPremiumSquareText(Board::Premium premium);
+    // Mouse and interaction
+    int mouseX, mouseY;
+    bool isDragging;
+    int selectedTileIndex;
 
+    // Word placement
+    bool isPlacingWord;
+    bool hasSetDirection;
+    int placementDirection; // 0 = horizontal, 1 = vertical
     std::vector<std::pair<int, int>> pendingPlacements;
     std::vector<int> pendingTileIndices;
+
+    // Game log
+    std::vector<std::string> gameLog;
+
+    // Event handling
+    void handleEvents();
+    void handleMouseClick(int x, int y);
+    void handleMouseRelease(int x, int y);
+
+    // Game logic
+    void update();
+    bool isValidMove(int row, int col) const;
+    void startWordPlacement();
+    bool canAddTileToWord(int row, int col);
+    void addTileToWord(int row, int col, int tileIndex);
+    void commitWord();
+    void cancelWordPlacement();
+    void passTurn();
+    bool validateWordPlacement();
+    void initializePlayers();
+    void dealInitialTiles();
+    int getPlayerCount() const;
+
+    // Word analysis
     std::vector<std::string> getFormedWords() const;
-std::string getMainWordFromPlacements() const;
-std::string getHorizontalWordAt(int row, int col, int tileIndex) const;
-std::string getVerticalWordAt(int row, int col, int tileIndex) const;
-std::string buildWordFromPosition(int row, int col, int deltaRow, int deltaCol, int newTileIndex = -1) const;
+    std::string getMainWordFromPlacements() const;
+    std::string getHorizontalWordAt(int row, int col, int tileIndex) const;
+    std::string getVerticalWordAt(int row, int col, int tileIndex) const;
+    std::string buildWordFromPosition(int row, int col, int deltaRow, int deltaCol, int newTileIndex) const;
 
+    // Scoring
+    int calculateWordScore(const std::string &word) const;
 
-    int placementDirection;
+    // Utility functions
     int getTileIndexAtPosition(int x, int y);
     bool getBoardPosition(int x, int y, int &row, int &col);
     bool isPositionOnBoard(int x, int y);
     bool isPositionInHand(int x, int y);
-    bool isValidMove(int row, int col) const;
-    bool validateWordsFormed(int row, int col) const;
-    bool isPlacingWord;
-    bool hasSetDirection;
-};
+    SDL_Color getPremiumSquareColor(Board::Premium premium);
+    std::string getPremiumSquareText(Board::Premium premium);
 
-#endif
+    // Rendering
+    void render();
+    void renderBoard();
+    void renderPendingPlacements();
+    void renderPlayerHand();
+    void renderGameInfo();
+    void renderLog();
+    void renderDraggedTile();
+    void renderPlayerSelection();
+
+    // Logging
+    void addLog(const std::string &message);
+};

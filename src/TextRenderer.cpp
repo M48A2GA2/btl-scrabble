@@ -65,7 +65,7 @@ void TextRenderer::renderText(const std::string &text, int x, int y, SDL_Color c
         return;
     }
 
-    SDL_Surface *textSurface = TTF_RenderText_Blended(font, text.c_str(), color);
+    SDL_Surface *textSurface = TTF_RenderUTF8_Blended(font, text.c_str(), color);
     if (!textSurface)
     {
         std::cerr << "ERROR: Failed to create text surface: " << TTF_GetError() << '\n';
@@ -99,7 +99,7 @@ void TextRenderer::renderCenteredText(const std::string &text, int x, int y, int
         return;
     }
 
-    SDL_Surface *textSurface = TTF_RenderText_Blended(font, text.c_str(), color);
+    SDL_Surface *textSurface = TTF_RenderUTF8_Blended(font, text.c_str(), color);
     if (!textSurface)
     {
         std::cerr << "ERROR: Failed to create text surface: " << TTF_GetError() << '\n';

@@ -2,11 +2,13 @@
 #include <iostream>
 #include <SDL2/SDL.h>
 #include <algorithm>
+#include <vector>
+#include <string>
 
 Game::Game() : window(nullptr), renderer(nullptr), running(false),
                currentPlayer(0), selectedTileIndex(-1), isDragging(false),
                mouseX(0), mouseY(0), placementDirection(0), isPlacingWord(false),
-               hasSetDirection(false) {}
+               hasSetDirection(false), gameState(PLAYER_SELECTION), playerCount(2) {}
 
 Game::~Game()
 {
@@ -51,14 +53,13 @@ bool Game::initialize()
     //     return false;
     // }
 
-    if (!textRenderer.initialize(renderer, "assets/fonts/DejaVuSans.ttf", 20))
+    if (!textRenderer.initialize(renderer, "assets/fonts/DejaVuSans.ttf", 16))
     {
-        std::cerr << "Failed to initialize text renderer" << std::endl;
+        addLog("Failed to initialize text renderer");
         return false;
     }
 
-    initializePlayers();
-    dealInitialTiles();
+    addLog("Use number keys 2-4 to select player count, then press ENTER");
 
     running = true;
     return true;
@@ -66,8 +67,19 @@ bool Game::initialize()
 
 void Game::initializePlayers()
 {
-    players.emplace_back("Player 1");
-    players.emplace_back("Player 2");
+    players.clear();
+
+    for (int i = 0; i < playerCount; i++)
+    {
+        players.emplace_back("Player " + std::to_string(i + 1));
+    }
+
+    addLog("Game started with " + std::to_string(playerCount) + " players");
+}
+
+int Game::getPlayerCount() const
+{
+    return playerCount;
 }
 
 void Game::dealInitialTiles()
@@ -103,42 +115,68 @@ void Game::handleEvents()
             running = false;
             break;
         case SDL_KEYDOWN:
-            if (event.key.keysym.sym == SDLK_ESCAPE)
+            if (gameState == PLAYER_SELECTION)
             {
-                if (isPlacingWord)
+                if (event.key.keysym.sym >= SDLK_2 && event.key.keysym.sym <= SDLK_4)
                 {
-                    cancelWordPlacement();
+                    playerCount = event.key.keysym.sym - SDLK_0;
+                    addLog("Selected " + std::to_string(playerCount) + " players. Press ENTER to start.");
                 }
-                else
+                else if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER)
                 {
-                    running = false;
-                }
-            }
-            else if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER)
-            {
-                if (isPlacingWord)
-                {
-                    commitWord();
+                    gameState = PLAYING;
+                    addLog("Starting game with " + std::to_string(playerCount) + " players!");
+                    initializePlayers();
+                    dealInitialTiles();
                 }
             }
-            else if (event.key.keysym.sym == SDLK_SPACE)
+            else if (gameState == PLAYING)
             {
-                if (!isPlacingWord)
+                if (event.key.keysym.sym == SDLK_ESCAPE)
                 {
-                    // Switch players (temporary)
-                    currentPlayer = (currentPlayer + 1) % players.size();
+                    if (isPlacingWord)
+                    {
+                        cancelWordPlacement();
+                    }
+                    else
+                    {
+                        running = false;
+                    }
+                }
+                else if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER)
+                {
+                    if (isPlacingWord)
+                    {
+                        commitWord();
+                    }
+                }
+                else if (event.key.keysym.sym == SDLK_SPACE)
+                {
+                    if (!isPlacingWord)
+                    {
+                        // Pass turn
+                        passTurn();
+                    }
+                }
+                else if (event.key.keysym.sym == SDLK_p)
+                {
+                    if (!isPlacingWord)
+                    {
+                        // Pass turn
+                        passTurn();
+                    }
                 }
             }
             break;
 
         case SDL_MOUSEBUTTONDOWN:
-            if (event.button.button == SDL_BUTTON_LEFT)
+            if (gameState == PLAYING && event.button.button == SDL_BUTTON_LEFT)
             {
                 handleMouseClick(event.button.x, event.button.y);
             }
             break;
         case SDL_MOUSEBUTTONUP:
-            if (event.button.button == SDL_BUTTON_LEFT)
+            if (gameState == PLAYING && event.button.button == SDL_BUTTON_LEFT)
             {
                 handleMouseRelease(event.button.x, event.button.y);
             }
@@ -158,35 +196,9 @@ void Game::handleMouseClick(int x, int y)
     {
         selectedTileIndex = tileIndex;
         isDragging = true;
-        std::cout << "Selected tile: " << players[currentPlayer].getHand()[tileIndex]->letter << std::endl;
+        addLog("Selected tile: " + std::string(1, players[currentPlayer].getHand()[tileIndex]->letter));
     }
 }
-
-// void Game::handleMouseRelease(int x, int y)
-// {
-//     // if (isDragging && selectedTileIndex != -1)
-//     // {
-//     //     // isDragging = false;
-//     //     int row, col;
-//     //     if (getBoardPosition(x, y, row, col))
-//     //     {
-//     //         auto tile = players[currentPlayer].removeTile(selectedTileIndex);
-//     //         if (tile && board.placeTile(row, col, std::move(tile)))
-//     //         {
-//     //             std::cout << "Placed tile on board: " << tile->letter << std::endl;
-//     //             if (!tileBag.isEmpty() && players[currentPlayer].hasEmptySlots())
-//     //             {
-//     //                 players[currentPlayer].addTile(tileBag.drawTile());
-//     //             }
-//     //         }
-//     //         else
-//     //         {
-//     //             if (tile)
-//     //             {
-//     //                 players[currentPlayer].addTile(std::move(tile)); // Return tile to hand if placement failed
-//     //                 std::cout << "Failed to place tile on board, returning to hand." << std::endl;
-//     //             }
-//     //             std::cout << "No tile selected." << std::endl;
 
 void Game::handleMouseRelease(int x, int y)
 {
@@ -195,8 +207,35 @@ void Game::handleMouseRelease(int x, int y)
         int row, col;
         if (getBoardPosition(x, y, row, col))
         {
+            // Check if clicking on a pending placement to remove it
             if (isPlacingWord)
             {
+                for (size_t i = 0; i < pendingPlacements.size(); i++)
+                {
+                    if (pendingPlacements[i].first == row && pendingPlacements[i].second == col)
+                    {
+                        // Remove this pending placement
+                        addLog("Removed tile from (" + std::to_string(row) + ", " + std::to_string(col) + ")");
+                        pendingPlacements.erase(pendingPlacements.begin() + i);
+                        pendingTileIndices.erase(pendingTileIndices.begin() + i);
+                        
+                        // Reset direction if removing all tiles
+                        if (pendingPlacements.empty())
+                        {
+                            cancelWordPlacement();
+                        }
+                        else if (pendingPlacements.size() == 1)
+                        {
+                            // Reset direction if only one tile left
+                            hasSetDirection = false;
+                        }
+                        
+                        selectedTileIndex = -1;
+                        isDragging = false;
+                        return;
+                    }
+                }
+                
                 // Add to current word
                 if (canAddTileToWord(row, col))
                 {
@@ -204,7 +243,7 @@ void Game::handleMouseRelease(int x, int y)
                 }
                 else
                 {
-                    std::cout << "Cannot add tile there - violates word placement rules" << std::endl;
+                    addLog("Cannot add tile there - violates word placement rules");
                 }
             }
             else
@@ -215,6 +254,17 @@ void Game::handleMouseRelease(int x, int y)
                     startWordPlacement();
                     addTileToWord(row, col, selectedTileIndex);
                 }
+                else
+                {
+                    if (board.isEmpty())
+                    {
+                        addLog("First tile must be placed on the center star!");
+                    }
+                    else
+                    {
+                        addLog("Tiles must connect to existing words on the board");
+                    }
+                }
             }
         }
     }
@@ -224,222 +274,30 @@ void Game::handleMouseRelease(int x, int y)
     isDragging = false;
 }
 
+void Game::addLog(const std::string &message)
+{
+    gameLog.push_back(message);
+    if (gameLog.size() > 10) // Keep log size manageable
+    {
+        gameLog.erase(gameLog.begin());
+    }
+    // Removed terminal logging - log only appears in game window now
+}
+
 bool Game::isValidMove(int row, int col) const
 {
-    return board.canPlaceTile(row, col);
-}
-
-bool Game::validateWordsFormed(int row, int col) const
-{
-    // Create a single position vector for this tile
-    std::vector<std::pair<int, int>> positions = {{row, col}};
-    auto words = board.getWordsFormedByMove(positions);
-
-    // Single tiles don't form words unless it's the first move
-    if (words.empty() && board.isFirstMovePlayed())
-    {
-        return false; // Must form at least one word after first move
-    }
-
-    // Check all formed words against dictionary
-    for (const auto &wordInfo : words)
-    {
-        if (!dictionary.isValidWord(wordInfo.word))
-        {
-            std::cout << "Invalid word: " << wordInfo.word << std::endl;
-            return false;
-        }
-        else
-        {
-            std::cout << "Valid word: " << wordInfo.word << std::endl;
-        }
-    }
-
-    return true;
-}
-
-bool Game::validateCompleteMove(const std::vector<std::pair<int, int>> &positions)
-{
-    if (positions.empty())
+    // Must be an empty square
+    if (!board.canPlaceTile(row, col))
         return false;
 
-    // Check if tiles form a continuous line
-    if (!tilesFormLine(positions))
+    // First move must go through center (7,7)
+    if (board.isEmpty())
     {
-        std::cout << "Tiles must form a continuous line\n";
-        return false;
+        return (row == 7 && col == 7);
     }
 
-    // Check adjacency to existing tiles (except first move)
-    if (board.isFirstMovePlayed())
-    {
-        bool hasAdjacency = false;
-        for (const auto &pos : positions)
-        {
-            if (board.isAdjacentToExistingTile(pos.first, pos.second))
-            {
-                hasAdjacency = true;
-                break;
-            }
-        }
-        if (!hasAdjacency)
-        {
-            std::cout << "New tiles must connect to existing tiles\n";
-            return false;
-        }
-    }
-    else
-    {
-        // First move must include center square
-        bool includesCenter = false;
-        for (const auto &pos : positions)
-        {
-            if (pos.first == 7 && pos.second == 7)
-            {
-                includesCenter = true;
-                break;
-            }
-        }
-        if (!includesCenter)
-        {
-            std::cout << "First move must include center square\n";
-            return false;
-        }
-    }
-
-    // Validate all formed words
-    auto words = board.getWordsFormedByMove(positions);
-    if (words.empty() && board.isFirstMovePlayed())
-    {
-        std::cout << "Move must form at least one word\n";
-        return false;
-    }
-
-    for (const auto &wordInfo : words)
-    {
-        if (wordInfo.word.length() > 1 && !dictionary.isValidWord(wordInfo.word))
-        {
-            std::cout << "Invalid word formed: " << wordInfo.word << '\n';
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool Game::tilesFormLine(const std::vector<std::pair<int, int>> &positions)
-{
-    if (positions.size() <= 1)
-        return true;
-
-    // Sort positions
-    auto sortedPos = positions;
-    std::sort(sortedPos.begin(), sortedPos.end());
-
-    // Check if all in same row
-    bool sameRow = true;
-    for (size_t i = 1; i < sortedPos.size(); ++i)
-    {
-        if (sortedPos[i].first != sortedPos[0].first)
-        {
-            sameRow = false;
-            break;
-        }
-    }
-
-    // Check if all in same column
-    bool sameCol = true;
-    for (size_t i = 1; i < sortedPos.size(); ++i)
-    {
-        if (sortedPos[i].second != sortedPos[0].second)
-        {
-            sameCol = false;
-            break;
-        }
-    }
-
-    if (!sameRow && !sameCol)
-        return false;
-
-    // Check for gaps (considering existing tiles)
-    if (sameRow)
-    {
-        for (int col = sortedPos[0].second; col <= sortedPos.back().second; ++col)
-        {
-            int row = sortedPos[0].first;
-            if (!board.getSquare(row, col).isOccupied())
-            {
-                // Check if this position is in our placement list
-                bool inPlacement = std::find(positions.begin(), positions.end(),
-                                             std::make_pair(row, col)) != positions.end();
-                if (!inPlacement)
-                {
-                    return false; // Gap found
-                }
-            }
-        }
-    }
-    else
-    {
-        for (int row = sortedPos[0].first; row <= sortedPos.back().first; ++row)
-        {
-            int col = sortedPos[0].second;
-            if (!board.getSquare(row, col).isOccupied())
-            {
-                bool inPlacement = std::find(positions.begin(), positions.end(),
-                                             std::make_pair(row, col)) != positions.end();
-                if (!inPlacement)
-                {
-                    return false; // Gap found
-                }
-            }
-        }
-    }
-
-    return true;
-}
-
-int Game::calculateWordScore(const std::vector<std::pair<int, int>> &positions,
-                             const std::vector<std::unique_ptr<Tile>> &tiles)
-{
-    int score = 0;
-    int wordMultiplier = 1;
-
-    for (size_t i = 0; i < positions.size(); i++)
-    {
-        int row = positions[i].first;
-        int col = positions[i].second;
-        auto &square = board.getSquare(row, col);
-
-        int letterScore = tiles[i]->points;
-
-        // Apply premium square multipliers
-        switch (square.premium)
-        {
-        case Board::DOUBLE_LETTER:
-            letterScore *= 2;
-            break;
-        case Board::TRIPLE_LETTER:
-            letterScore *= 3;
-            break;
-        case Board::DOUBLE_WORD:
-            wordMultiplier *= 2;
-            break;
-        case Board::TRIPLE_WORD:
-            wordMultiplier *= 3;
-            break;
-        case Board::START:
-            // START square acts as a regular square for scoring
-            break;
-        case Board::NONE:
-            // No premium bonus
-            break;
-        }
-
-        score += letterScore;
-    }
-
-    return score * wordMultiplier;
+    // Subsequent moves must connect to existing tiles
+    return board.isAdjacentToExistingTile(row, col);
 }
 
 int Game::getTileIndexAtPosition(int x, int y)
@@ -457,10 +315,6 @@ int Game::getTileIndexAtPosition(int x, int y)
             return static_cast<int>(i); // Return index of the tile
         }
     }
-    // int index = (x - BOARD_START_X) / (CELL_SIZE + 5);
-    // const auto &hand = players[currentPlayer].getHand();
-    // if (index < 0 || index >= static_cast<int>(hand.size()))
-    //     return -1; // Out of bounds
 
     return -1;
 }
@@ -553,15 +407,24 @@ void Game::renderDraggedTile()
 
 void Game::render()
 {
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    // Dark green background for better visibility
+    SDL_SetRenderDrawColor(renderer, 34, 80, 34, 255);
     SDL_RenderClear(renderer);
 
-    renderBoard();
-    renderPendingPlacements(); // Add this line
-    renderPlayerHand();
-    renderGameInfo();
-    renderDraggedTile();
+    if (gameState == PLAYER_SELECTION)
+    {
+        renderPlayerSelection();
+    }
+    else if (gameState == PLAYING)
+    {
+        renderBoard();
+        renderPendingPlacements();
+        renderPlayerHand();
+        renderGameInfo();
+        renderDraggedTile();
+    }
 
+    renderLog();
     SDL_RenderPresent(renderer);
 }
 
@@ -586,24 +449,29 @@ void Game::renderBoard()
 
             if (square.isOccupied())
             {
-                // Render placed tiles
+                // Render placed tiles with light tile background
+                SDL_SetRenderDrawColor(renderer, 240, 220, 180, 255); // Tile color
+                SDL_RenderFillRect(renderer, &rect);
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+                SDL_RenderDrawRect(renderer, &rect);
+
                 char letter = square.tile->letter;
                 if (letter == ' ')
                     letter = '?';
 
                 std::string letterStr(1, letter);
-                textRenderer.renderCenteredText(letterStr, x, y, CELL_SIZE, CELL_SIZE, {0, 0, 0, 255}); // WHITE text for visibility
+                textRenderer.renderCenteredText(letterStr, x, y, CELL_SIZE, CELL_SIZE, {0, 0, 0, 255}); // Black text for visibility
 
                 std::string pointsStr = std::to_string(square.tile->points);
-                textRenderer.renderText(pointsStr, x + CELL_SIZE - 15, y + CELL_SIZE - 15, {255, 255, 255, 255});
+                textRenderer.renderText(pointsStr, x + CELL_SIZE - 15, y + CELL_SIZE - 15, {0, 0, 0, 255});
             }
             else
             {
-                // ADD THIS: Render premium square labels for empty squares
+                // Render premium square labels ONLY for empty squares
                 std::string premiumText = getPremiumSquareText(square.premium);
                 if (!premiumText.empty())
                 {
-                    textRenderer.renderCenteredText(premiumText, x, y, CELL_SIZE, CELL_SIZE, {255, 255, 255, 255});
+                    textRenderer.renderCenteredText(premiumText, x, y, CELL_SIZE, CELL_SIZE, {0, 0, 0, 255});
                 }
             }
         }
@@ -648,7 +516,7 @@ void Game::renderPlayerHand()
 
     // Current player indicator
     std::string playerText = players[currentPlayer].getName() + "'s Turn (Click to place tile)";
-    textRenderer.renderText(playerText, BOARD_START_X, handStartY - 30, {255, 255, 255, 255});
+    textRenderer.renderText(playerText, BOARD_START_X, handStartY - 30, {220, 220, 220, 255}); // Light gray text
 
     // Render hand tiles
     const auto &hand = players[currentPlayer].getHand();
@@ -660,9 +528,27 @@ void Game::renderPlayerHand()
         SDL_Rect rect = {x, y, CELL_SIZE, CELL_SIZE};
 
         // highlight selected tile
+        bool isPendingPlacement = false;
+        if (isPlacingWord)
+        {
+            // Check if this tile is part of a pending placement
+            for (size_t j = 0; j < pendingTileIndices.size(); j++)
+            {
+                if (pendingTileIndices[j] == static_cast<int>(i))
+                {
+                    isPendingPlacement = true;
+                    break;
+                }
+            }
+        }
+
         if (static_cast<int>(i) == selectedTileIndex && isDragging)
         {
             SDL_SetRenderDrawColor(renderer, 255, 255, 100, 255); // Yellow highlight
+        }
+        else if (isPendingPlacement)
+        {
+            SDL_SetRenderDrawColor(renderer, 150, 255, 150, 255); // Green tint for pending tiles
         }
         else
         {
@@ -670,16 +556,12 @@ void Game::renderPlayerHand()
         }
 
         // Tile background
-        // SDL_SetRenderDrawColor(renderer, 240, 220, 180, 255);
         SDL_RenderFillRect(renderer, &rect);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderDrawRect(renderer, &rect);
 
-        // skip rendering the dragged tile
-        if (static_cast<int>(i) == selectedTileIndex && isDragging)
-        {
-            continue;
-        }
+        // Always render letters, don't skip pending tiles
+        // Removed the skip logic for dragged tiles so they remain visible
 
         // Letter
         char letter = hand[i]->letter;
@@ -718,13 +600,32 @@ void Game::renderGameInfo()
     for (size_t i = 0; i < players.size(); i++)
     {
         std::string scoreText = players[i].getName() + ": " + std::to_string(players[i].getScore());
-        SDL_Color color = (i == currentPlayer) ? SDL_Color{255, 255, 0, 255} : SDL_Color{255, 255, 255, 255};
+        SDL_Color color = (i == currentPlayer) ? SDL_Color{255, 220, 100, 255} : SDL_Color{200, 200, 200, 255}; // Gold for current player, light gray for others
         textRenderer.renderText(scoreText, infoX, infoY + i * 30, color);
     }
 
     // Tiles remaining
     std::string tilesText = "Tiles remaining: " + std::to_string(tileBag.remainingTiles());
-    textRenderer.renderText(tilesText, infoX, infoY + 100, {255, 255, 255, 255});
+    textRenderer.renderText(tilesText, infoX, infoY + 100, {200, 200, 200, 255}); // Light gray text
+
+    // Controls
+    int controlsY = infoY + 130;
+    textRenderer.renderText("Controls:", infoX, controlsY, {255, 220, 100, 255});
+    textRenderer.renderText("ENTER - Commit word", infoX, controlsY + 20, {180, 180, 180, 255});
+    textRenderer.renderText("ESC - Cancel/Quit", infoX, controlsY + 40, {180, 180, 180, 255});
+    textRenderer.renderText("SPACE/P - Pass turn", infoX, controlsY + 60, {180, 180, 180, 255});
+}
+
+void Game::renderLog()
+{
+    int logX = BOARD_START_X + Board::BOARD_SIZE * CELL_SIZE + 50;
+    int logY = BOARD_START_Y + 200;
+    textRenderer.renderText("Game Log:", logX, logY, {255, 220, 100, 255}); // Gold header
+
+    for (size_t i = 0; i < gameLog.size(); ++i)
+    {
+        textRenderer.renderText(gameLog[i], logX, logY + (i + 1) * 20, {220, 220, 220, 255}); // Light gray log text
+    }
 }
 
 void Game::startWordPlacement()
@@ -733,21 +634,34 @@ void Game::startWordPlacement()
     hasSetDirection = false;
     pendingPlacements.clear();
     pendingTileIndices.clear();
-    std::cout << "Started word placement mode" << std::endl;
+    addLog("Started word placement mode");
 }
 
-bool Game::canAddTileToWord(int row, int col) const
+bool Game::canAddTileToWord(int row, int col)
 {
     // Must be empty square
     if (board.getSquare(row, col).isOccupied())
     {
+        addLog("Cannot place tile: Square is occupied");
         return false;
     }
 
     // First tile can go anywhere valid
     if (pendingPlacements.empty())
     {
-        return board.canPlaceTile(row, col);
+        bool valid = isValidMove(row, col);
+        if (!valid)
+        {
+            if (board.isEmpty())
+            {
+                addLog("First tile must be placed on center star (7,7)");
+            }
+            else
+            {
+                addLog("Tile must connect to existing words");
+            }
+        }
+        return valid;
     }
 
     // Subsequent tiles must be in line with first tile
@@ -756,18 +670,37 @@ bool Game::canAddTileToWord(int row, int col) const
 
     if (!hasSetDirection)
     {
-        // Second tile determines direction
-        return (row == firstRow || col == firstCol);
+        // Second tile determines direction - must be adjacent in a line
+        bool sameRow = (row == firstRow);
+        bool sameCol = (col == firstCol);
+        bool validDirection = (sameRow || sameCol) && !(sameRow && sameCol);
+
+        if (!validDirection)
+        {
+            addLog("Second tile must be in same row or column as first tile");
+        }
+
+        return validDirection;
     }
 
     // Must continue in the established direction
     if (placementDirection == 0)
     { // Horizontal
-        return row == firstRow;
+        bool valid = (row == firstRow);
+        if (!valid)
+        {
+            addLog("Must continue placing horizontally in row " + std::to_string(firstRow));
+        }
+        return valid;
     }
     else
     { // Vertical
-        return col == firstCol;
+        bool valid = (col == firstCol);
+        if (!valid)
+        {
+            addLog("Must continue placing vertically in column " + std::to_string(firstCol));
+        }
+        return valid;
     }
 }
 
@@ -785,10 +718,10 @@ void Game::addTileToWord(int row, int col, int tileIndex)
         placementDirection = (row == firstRow) ? 0 : 1; // 0 = horizontal, 1 = vertical
         hasSetDirection = true;
 
-        std::cout << "Direction set to: " << (placementDirection == 0 ? "horizontal" : "vertical") << std::endl;
+        addLog("Direction set to: " + std::string(placementDirection == 0 ? "horizontal" : "vertical"));
     }
 
-    std::cout << "Added tile to word at (" << row << ", " << col << ")" << std::endl;
+    addLog("Added tile to word at (" + std::to_string(row) + ", " + std::to_string(col) + ")");
 }
 
 void Game::commitWord()
@@ -799,34 +732,58 @@ void Game::commitWord()
         return;
     }
 
-    // Place all tiles on board
-    std::vector<std::unique_ptr<Tile>> placedTiles;
-    for (int i = pendingTileIndices.size() - 1; i >= 0; i--)
+    // Create a list of indices to remove, sorted in descending order
+    // This prevents index shifting when removing tiles
+    std::vector<std::pair<int, std::pair<int, int>>> indexedPlacements;
+    for (size_t i = 0; i < pendingPlacements.size(); i++)
     {
-        auto tile = players[currentPlayer].removeTile(pendingTileIndices[i]);
-        placedTiles.push_back(std::move(tile));
+        indexedPlacements.push_back({pendingTileIndices[i], pendingPlacements[i]});
     }
 
-    // Place tiles in reverse order (since we removed them backwards)
-    for (int i = placedTiles.size() - 1; i >= 0; i--)
+    // Sort by tile index in descending order
+    std::sort(indexedPlacements.begin(), indexedPlacements.end(),
+              [](const auto &a, const auto &b)
+              { return a.first > b.first; });
+
+    // Remove tiles from hand (in descending index order) and place on board
+    for (const auto &indexedPlacement : indexedPlacements)
     {
-        int row = pendingPlacements[i].first;
-        int col = pendingPlacements[i].second;
-        board.placeTile(row, col, std::move(placedTiles[placedTiles.size() - 1 - i]));
+        int tileIndex = indexedPlacement.first;
+        int row = indexedPlacement.second.first;
+        int col = indexedPlacement.second.second;
+
+        auto tile = players[currentPlayer].removeTile(tileIndex);
+        if (tile)
+        {
+            board.placeTile(row, col, std::move(tile));
+            addLog("Placed tile at (" + std::to_string(row) + ", " + std::to_string(col) + ")");
+        }
+        else
+        {
+            addLog("Error: Could not remove tile at index " + std::to_string(tileIndex));
+        }
     }
 
-    // Calculate and add score
+    // Calculate and add score with proper Scrabble scoring
     auto words = getFormedWords();
     int totalScore = 0;
     for (const auto &word : words)
     {
-        std::cout << "Formed word: " << word << std::endl;
-        // Add scoring logic here
-        totalScore += word.length() * 10; // Simple scoring for now
+        addLog("Formed word: " + word);
+        int wordScore = calculateWordScore(word);
+        totalScore += wordScore;
+        addLog("Word '" + word + "' scored: " + std::to_string(wordScore));
+    }
+
+    // Bonus for using all 7 tiles (50 points)
+    if (pendingPlacements.size() == 7)
+    {
+        totalScore += 50;
+        addLog("Bonus for using all tiles: +50");
     }
 
     players[currentPlayer].addScore(totalScore);
-    std::cout << "Score added: " << totalScore << std::endl;
+    addLog("Total score added: " + std::to_string(totalScore));
 
     // Draw new tiles
     while (players[currentPlayer].hasEmptySlots() && !tileBag.isEmpty())
@@ -843,27 +800,62 @@ void Game::commitWord()
 
 void Game::cancelWordPlacement()
 {
-    std::cout << "Cancelled word placement" << std::endl;
+    addLog("Cancelled word placement");
     isPlacingWord = false;
     pendingPlacements.clear();
     pendingTileIndices.clear();
     hasSetDirection = false;
 }
 
-bool Game::validateWordPlacement() const
+void Game::passTurn()
+{
+    addLog(players[currentPlayer].getName() + " passes their turn");
+    currentPlayer = (currentPlayer + 1) % players.size();
+    addLog("Now " + players[currentPlayer].getName() + "'s turn");
+}
+
+bool Game::validateWordPlacement()
 {
     if (pendingPlacements.empty())
+    {
+        addLog("No tiles placed!");
         return false;
+    }
+
+    // Check if first word goes through center
+    if (board.isEmpty())
+    {
+        bool goesThoughCenter = false;
+        for (const auto &placement : pendingPlacements)
+        {
+            if (placement.first == 7 && placement.second == 7)
+            {
+                goesThoughCenter = true;
+                break;
+            }
+        }
+        if (!goesThoughCenter)
+        {
+            addLog("First word must go through the center star!");
+            return false;
+        }
+    }
 
     // Get all formed words and validate
     auto words = getFormedWords();
+    if (words.empty())
+    {
+        addLog("No valid words formed!");
+        return false;
+    }
+
     for (const auto &word : words)
     {
         if (word.length() < 2)
             continue; // Single letters don't need validation
         if (!dictionary.isValidWord(word))
         {
-            std::cout << "Invalid word: " << word << std::endl;
+            addLog("Invalid word: " + word);
             return false;
         }
     }
@@ -1106,204 +1098,31 @@ std::string Game::buildWordFromPosition(int row, int col, int deltaRow, int delt
     return word;
 }
 
-bool Game::hasGapsInWordPlacement() const
+int Game::calculateWordScore(const std::string &word) const
 {
-    if (pendingPlacements.size() <= 1)
-        return false;
+    // Basic tile values (official Scrabble scoring)
+    const int tileValues[26] = {
+        1, 3, 3, 2, 1, 4, 2, 4, 1, 8, 5, 1, 3, 1, 1, 3, 10, 1, 1, 1, 1, 4, 4, 8, 4, 10
+        // A, B, C, D, E, F, G, H, I, J, K, L, M,  N, O, P, Q,  R, S, T, U, V, W, X, Y, Z
+    };
 
-    auto sortedPos = pendingPlacements;
-    std::sort(sortedPos.begin(), sortedPos.end());
-
-    if (placementDirection == 0)
-    { // Horizontal
-        int row = sortedPos[0].first;
-        for (int col = sortedPos[0].second; col <= sortedPos.back().second; ++col)
-        {
-            // Check if position has a tile (either placed or pending)
-            bool hasPlacedTile = board.getSquare(row, col).isOccupied();
-            bool hasPendingTile = std::find(pendingPlacements.begin(), pendingPlacements.end(),
-                                            std::make_pair(row, col)) != pendingPlacements.end();
-
-            if (!hasPlacedTile && !hasPendingTile)
-            {
-                std::cout << "Gap found at position (" << row << ", " << col << ")" << std::endl;
-                return true; // Gap found
-            }
-        }
-    }
-    else
-    { // Vertical
-        int col = sortedPos[0].second;
-        for (int row = sortedPos[0].first; row <= sortedPos.back().first; ++row)
-        {
-            bool hasPlacedTile = board.getSquare(row, col).isOccupied();
-            bool hasPendingTile = std::find(pendingPlacements.begin(), pendingPlacements.end(),
-                                            std::make_pair(row, col)) != pendingPlacements.end();
-
-            if (!hasPlacedTile && !hasPendingTile)
-            {
-                std::cout << "Gap found at position (" << row << ", " << col << ")" << std::endl;
-                return true; // Gap found
-            }
-        }
-    }
-
-    return false;
-}
-
-int Game::calculateCompleteWordScore(const std::vector<std::pair<int, int>> &positions)
-{
-    if (positions.empty())
-        return 0;
-
-    int totalScore = 0;
-
-    // Calculate main word score
-    int mainWordScore = 0;
-    int wordMultiplier = 1;
-
-    // Get the complete main word
-    std::string mainWord = getMainWordFromPlacements();
-
-    // Calculate score for each position in the main word
-    for (const auto &pos : positions)
+    int score = 0;
+    for (char c : word)
     {
-        int row = pos.first;
-        int col = pos.second;
-        auto &square = board.getSquare(row, col);
-
-        // Get tile points
-        int letterScore = 0;
-        auto pendingIt = std::find(pendingPlacements.begin(), pendingPlacements.end(), pos);
-        if (pendingIt != pendingPlacements.end())
+        if (c >= 'A' && c <= 'Z')
         {
-            int index = std::distance(pendingPlacements.begin(), pendingIt);
-            letterScore = players[currentPlayer].getHand()[pendingTileIndices[index]]->points;
-
-            // Apply premium squares only for newly placed tiles
-            switch (square.premium)
-            {
-            case Board::DOUBLE_LETTER:
-                letterScore *= 2;
-                std::cout << "Double letter score applied at (" << row << ", " << col << ")" << std::endl;
-                break;
-            case Board::TRIPLE_LETTER:
-                letterScore *= 3;
-                std::cout << "Triple letter score applied at (" << row << ", " << col << ")" << std::endl;
-                break;
-            case Board::DOUBLE_WORD:
-                wordMultiplier *= 2;
-                std::cout << "Double word score applied at (" << row << ", " << col << ")" << std::endl;
-                break;
-            case Board::TRIPLE_WORD:
-                wordMultiplier *= 3;
-                std::cout << "Triple word score applied at (" << row << ", " << col << ")" << std::endl;
-                break;
-            default:
-                break;
-            }
+            score += tileValues[c - 'A'];
         }
-
-        mainWordScore += letterScore;
-    }
-
-    // Apply word multiplier to main word
-    mainWordScore *= wordMultiplier;
-    totalScore += mainWordScore;
-
-    std::cout << "Main word '" << mainWord << "' scores " << mainWordScore << " points" << std::endl;
-
-    // Add cross-word scores
-    int crossWordScore = calculateCrossWordScores();
-    totalScore += crossWordScore;
-
-    // Bingo bonus: +50 points for using all 7 tiles
-    if (pendingPlacements.size() == 7)
-    {
-        totalScore += 50;
-        std::cout << "BINGO! +50 bonus points for using all tiles!" << std::endl;
-    }
-
-    return totalScore;
-}
-
-int Game::calculateCrossWordScores() const
-{
-    int totalCrossScore = 0;
-
-    for (size_t i = 0; i < pendingPlacements.size(); i++)
-    {
-        int row = pendingPlacements[i].first;
-        int col = pendingPlacements[i].second;
-
-        std::string crossWord;
-        int crossScore = 0;
-        int crossWordMultiplier = 1;
-
-        // Get cross-word in perpendicular direction
-        if (placementDirection == 0)
-        { // Main word is horizontal, check vertical
-            crossWord = getVerticalWordAt(row, col, pendingTileIndices[i]);
-        }
-        else
-        { // Main word is vertical, check horizontal
-            crossWord = getHorizontalWordAt(row, col, pendingTileIndices[i]);
-        }
-
-        // Only score cross-words that are longer than 1 letter
-        if (crossWord.length() > 1)
+        else if (c >= 'a' && c <= 'z')
         {
-            // Calculate cross-word score
-            std::vector<std::pair<int, int>> crossPositions;
-
-            // This is a simplified version - in a complete implementation,
-            // you'd need to get all positions of the cross-word
-            auto &square = board.getSquare(row, col);
-            int letterScore = players[currentPlayer].getHand()[pendingTileIndices[i]]->points;
-
-            // Apply premium squares
-            switch (square.premium)
-            {
-            case Board::DOUBLE_LETTER:
-                letterScore *= 2;
-                break;
-            case Board::TRIPLE_LETTER:
-                letterScore *= 3;
-                break;
-            case Board::DOUBLE_WORD:
-                crossWordMultiplier *= 2;
-                break;
-            case Board::TRIPLE_WORD:
-                crossWordMultiplier *= 3;
-                break;
-            default:
-                break;
-            }
-
-            // For simplicity, just add the new tile's contribution
-            // In a complete implementation, you'd calculate the full cross-word score
-            crossScore = letterScore * crossWordMultiplier;
-            totalCrossScore += crossScore;
-
-            std::cout << "Cross-word '" << crossWord << "' scores " << crossScore << " points" << std::endl;
+            score += tileValues[c - 'a'];
         }
     }
 
-    return totalCrossScore;
-}
-
-int Game::getTilePoints(int row, int col) const
-{
-    if (!board.isInBounds(row, col))
-        return 0;
-
-    auto &square = board.getSquare(row, col);
-    if (square.isOccupied())
-    {
-        return square.tile->points;
-    }
-
-    return 0;
+    // For this simplified version, we return base letter values
+    // In a full implementation, premium squares would be calculated
+    // based on which tiles were just placed and their board positions
+    return score;
 }
 
 SDL_Color Game::getPremiumSquareColor(Board::Premium premium)
@@ -1341,6 +1160,35 @@ std::string Game::getPremiumSquareText(Board::Premium premium)
         return "2L";
     default:
         return "";
+    }
+}
+
+void Game::renderPlayerSelection()
+{
+    int centerX = WINDOW_WIDTH / 2;
+    int centerY = WINDOW_HEIGHT / 2;
+
+    // Title
+    std::string title = "SCRABBLE";
+    textRenderer.renderCenteredText(title, centerX - 100, centerY - 100, 200, 50, {255, 220, 100, 255});
+
+    // Instructions
+    std::string instruction1 = "Select Number of Players (2-4)";
+    textRenderer.renderCenteredText(instruction1, centerX - 150, centerY - 40, 300, 30, {220, 220, 220, 255});
+
+    std::string instruction2 = "Press 2, 3, or 4, then ENTER";
+    textRenderer.renderCenteredText(instruction2, centerX - 120, centerY - 10, 240, 25, {200, 200, 200, 255});
+
+    // Current selection
+    std::string selection = "Current: " + std::to_string(playerCount) + " players";
+    textRenderer.renderCenteredText(selection, centerX - 80, centerY + 30, 160, 25, {255, 220, 100, 255});
+
+    // Player options
+    for (int i = 2; i <= 4; i++)
+    {
+        std::string option = std::to_string(i) + " Players";
+        SDL_Color color = (i == playerCount) ? SDL_Color{255, 255, 100, 255} : SDL_Color{180, 180, 180, 255};
+        textRenderer.renderCenteredText(option, centerX - 40, centerY + 60 + (i - 2) * 30, 80, 25, color);
     }
 }
 
