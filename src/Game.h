@@ -102,6 +102,7 @@ private:
     bool isPositionInHand(int x, int y);
     SDL_Color getPremiumSquareColor(Board::Premium premium);
     std::string getPremiumSquareText(Board::Premium premium);
+    void validateTileIndices(); // Clean up invalid tile indices
 
     // Rendering
     void render();

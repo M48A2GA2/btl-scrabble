@@ -59,6 +59,9 @@ bool Game::initialize()
         return false;
     }
 
+    // Print dictionary statistics
+    dictionary.printStats();
+
     addLog("Use number keys 2-4 to select player count, then press ENTER");
 
     running = true;
@@ -194,9 +197,13 @@ void Game::handleMouseClick(int x, int y)
     int tileIndex = getTileIndexAtPosition(x, y);
     if (tileIndex != -1)
     {
-        selectedTileIndex = tileIndex;
-        isDragging = true;
-        addLog("Selected tile: " + std::string(1, players[currentPlayer].getHand()[tileIndex]->letter));
+        const auto &hand = players[currentPlayer].getHand();
+        if (tileIndex < static_cast<int>(hand.size()))
+        {
+            selectedTileIndex = tileIndex;
+            isDragging = true;
+            addLog("Selected tile: " + std::string(1, hand[tileIndex]->letter));
+        }
     }
 }
 
@@ -218,7 +225,7 @@ void Game::handleMouseRelease(int x, int y)
                         addLog("Removed tile from (" + std::to_string(row) + ", " + std::to_string(col) + ")");
                         pendingPlacements.erase(pendingPlacements.begin() + i);
                         pendingTileIndices.erase(pendingTileIndices.begin() + i);
-                        
+
                         // Reset direction if removing all tiles
                         if (pendingPlacements.empty())
                         {
@@ -229,13 +236,13 @@ void Game::handleMouseRelease(int x, int y)
                             // Reset direction if only one tile left
                             hasSetDirection = false;
                         }
-                        
+
                         selectedTileIndex = -1;
                         isDragging = false;
                         return;
                     }
                 }
-                
+
                 // Add to current word
                 if (canAddTileToWord(row, col))
                 {
@@ -282,6 +289,40 @@ void Game::addLog(const std::string &message)
         gameLog.erase(gameLog.begin());
     }
     // Removed terminal logging - log only appears in game window now
+}
+
+void Game::validateTileIndices()
+{
+    const auto &hand = players[currentPlayer].getHand();
+    int handSize = static_cast<int>(hand.size());
+
+    // Reset selectedTileIndex if it's invalid
+    if (selectedTileIndex >= handSize || selectedTileIndex < 0)
+    {
+        selectedTileIndex = -1;
+        isDragging = false;
+    }
+
+    // Clean up pendingTileIndices
+    for (int i = static_cast<int>(pendingTileIndices.size()) - 1; i >= 0; i--)
+    {
+        if (pendingTileIndices[i] >= handSize || pendingTileIndices[i] < 0)
+        {
+            pendingTileIndices.erase(pendingTileIndices.begin() + i);
+            if (i < static_cast<int>(pendingPlacements.size()))
+            {
+                pendingPlacements.erase(pendingPlacements.begin() + i);
+            }
+        }
+    }
+
+    // Reset word placement if no valid tiles remain
+    if (pendingTileIndices.empty())
+    {
+        isPlacingWord = false;
+        hasSetDirection = false;
+        placementDirection = 0;
+    }
 }
 
 bool Game::isValidMove(int row, int col) const
@@ -353,7 +394,16 @@ void Game::renderDraggedTile()
 {
     if (isDragging && selectedTileIndex != -1)
     {
-        const auto &tile = players[currentPlayer].getHand()[selectedTileIndex];
+        const auto &hand = players[currentPlayer].getHand();
+        if (selectedTileIndex >= static_cast<int>(hand.size()))
+        {
+            // Invalid index, reset dragging state
+            isDragging = false;
+            selectedTileIndex = -1;
+            return;
+        }
+
+        const auto &tile = hand[selectedTileIndex];
 
         // Draw tile at mouse position with some offset
         int x = mouseX - CELL_SIZE / 2;
@@ -501,12 +551,16 @@ void Game::renderPendingPlacements()
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
         // Show tile letter
-        char letter = players[currentPlayer].getHand()[tileIndex]->letter;
-        if (letter == ' ')
-            letter = '?';
+        const auto &hand = players[currentPlayer].getHand();
+        if (tileIndex >= 0 && tileIndex < static_cast<int>(hand.size()))
+        {
+            char letter = hand[tileIndex]->letter;
+            if (letter == ' ')
+                letter = '?';
 
-        std::string letterStr(1, letter);
-        textRenderer.renderCenteredText(letterStr, x, y, CELL_SIZE, CELL_SIZE, {0, 0, 0, 255});
+            std::string letterStr(1, letter);
+            textRenderer.renderCenteredText(letterStr, x, y, CELL_SIZE, CELL_SIZE, {0, 0, 0, 255});
+        }
     }
 }
 
@@ -600,13 +654,13 @@ void Game::renderGameInfo()
     for (size_t i = 0; i < players.size(); i++)
     {
         std::string scoreText = players[i].getName() + ": " + std::to_string(players[i].getScore());
-        SDL_Color color = (i == currentPlayer) ? SDL_Color{255, 220, 100, 255} : SDL_Color{200, 200, 200, 255}; // Gold for current player, light gray for others
+        SDL_Color color = (i == currentPlayer) ? SDL_Color{255, 220, 100, 255} : SDL_Color{200, 200, 200, 255};
         textRenderer.renderText(scoreText, infoX, infoY + i * 30, color);
     }
 
     // Tiles remaining
     std::string tilesText = "Tiles remaining: " + std::to_string(tileBag.remainingTiles());
-    textRenderer.renderText(tilesText, infoX, infoY + 100, {200, 200, 200, 255}); // Light gray text
+    textRenderer.renderText(tilesText, infoX, infoY + 100, {200, 200, 200, 255}); // Light gray
 
     // Controls
     int controlsY = infoY + 130;
@@ -732,6 +786,24 @@ void Game::commitWord()
         return;
     }
 
+    // Calculate formed words BEFORE placing tiles (while pendingTileIndices is still valid)
+    auto words = getFormedWords();
+    int totalScore = 0;
+    for (const auto &word : words)
+    {
+        addLog("Formed word: " + word);
+        int wordScore = calculateWordScore(word);
+        totalScore += wordScore;
+        addLog("Word '" + word + "' scored: " + std::to_string(wordScore));
+    }
+
+    // Bonus for using all 7 tiles (50 points)
+    if (pendingPlacements.size() == 7)
+    {
+        totalScore += 50;
+        addLog("Bonus for using all tiles: +50");
+    }
+
     // Create a list of indices to remove, sorted in descending order
     // This prevents index shifting when removing tiles
     std::vector<std::pair<int, std::pair<int, int>>> indexedPlacements;
@@ -764,23 +836,8 @@ void Game::commitWord()
         }
     }
 
-    // Calculate and add score with proper Scrabble scoring
-    auto words = getFormedWords();
-    int totalScore = 0;
-    for (const auto &word : words)
-    {
-        addLog("Formed word: " + word);
-        int wordScore = calculateWordScore(word);
-        totalScore += wordScore;
-        addLog("Word '" + word + "' scored: " + std::to_string(wordScore));
-    }
-
-    // Bonus for using all 7 tiles (50 points)
-    if (pendingPlacements.size() == 7)
-    {
-        totalScore += 50;
-        addLog("Bonus for using all tiles: +50");
-    }
+    // Validate tile indices after removing all tiles
+    validateTileIndices();
 
     players[currentPlayer].addScore(totalScore);
     addLog("Total score added: " + std::to_string(totalScore));
@@ -867,8 +924,19 @@ std::vector<std::string> Game::getFormedWords() const
 {
     std::vector<std::string> words;
 
-    if (pendingPlacements.empty())
+    if (pendingPlacements.empty() || pendingTileIndices.empty())
         return words;
+
+    // Safety check: ensure indices are valid
+    const auto &hand = players[currentPlayer].getHand();
+    for (int index : pendingTileIndices)
+    {
+        if (index < 0 || index >= static_cast<int>(hand.size()))
+        {
+            // Invalid index found, return empty to prevent crash
+            return words;
+        }
+    }
 
     // Get the main word being placed
     std::string mainWord = getMainWordFromPlacements();
@@ -880,6 +948,9 @@ std::vector<std::string> Game::getFormedWords() const
     // Get cross-words formed by each new tile
     for (size_t i = 0; i < pendingPlacements.size(); i++)
     {
+        if (i >= pendingTileIndices.size())
+            break; // Safety check
+
         int row = pendingPlacements[i].first;
         int col = pendingPlacements[i].second;
 
@@ -968,7 +1039,12 @@ std::string Game::getMainWordFromPlacements() const
             if (pendingIt != sortedPlacements.end())
             {
                 int index = std::distance(sortedPlacements.begin(), pendingIt);
-                letter = players[currentPlayer].getHand()[sortedIndices[index]]->getDisplayLetter();
+                const auto &hand = players[currentPlayer].getHand();
+                if (index >= 0 && index < static_cast<int>(sortedIndices.size()) &&
+                    sortedIndices[index] >= 0 && sortedIndices[index] < static_cast<int>(hand.size()))
+                {
+                    letter = hand[sortedIndices[index]]->getDisplayLetter();
+                }
             }
             else if (board.getSquare(row, col).isOccupied())
             {
@@ -1009,7 +1085,12 @@ std::string Game::getMainWordFromPlacements() const
             if (pendingIt != sortedPlacements.end())
             {
                 int index = std::distance(sortedPlacements.begin(), pendingIt);
-                letter = players[currentPlayer].getHand()[sortedIndices[index]]->getDisplayLetter();
+                const auto &hand = players[currentPlayer].getHand();
+                if (index >= 0 && index < static_cast<int>(sortedIndices.size()) &&
+                    sortedIndices[index] >= 0 && sortedIndices[index] < static_cast<int>(hand.size()))
+                {
+                    letter = hand[sortedIndices[index]]->getDisplayLetter();
+                }
             }
             else if (board.getSquare(row, col).isOccupied())
             {
@@ -1068,7 +1149,11 @@ std::string Game::buildWordFromPosition(int row, int col, int deltaRow, int delt
         // Check if this is the new tile position
         if (currentRow == row && currentCol == col && newTileIndex >= 0)
         {
-            letter = players[currentPlayer].getHand()[newTileIndex]->getDisplayLetter();
+            const auto &hand = players[currentPlayer].getHand();
+            if (newTileIndex < static_cast<int>(hand.size()))
+            {
+                letter = hand[newTileIndex]->getDisplayLetter();
+            }
         }
         // Check if there's a pending tile here
         else
@@ -1078,7 +1163,12 @@ std::string Game::buildWordFromPosition(int row, int col, int deltaRow, int delt
             if (pendingIt != pendingPlacements.end())
             {
                 int index = std::distance(pendingPlacements.begin(), pendingIt);
-                letter = players[currentPlayer].getHand()[pendingTileIndices[index]]->getDisplayLetter();
+                const auto &hand = players[currentPlayer].getHand();
+                if (index >= 0 && index < static_cast<int>(pendingTileIndices.size()) &&
+                    pendingTileIndices[index] >= 0 && pendingTileIndices[index] < static_cast<int>(hand.size()))
+                {
+                    letter = hand[pendingTileIndices[index]]->getDisplayLetter();
+                }
             }
             // Check if there's an existing tile
             else if (board.getSquare(currentRow, currentCol).isOccupied())

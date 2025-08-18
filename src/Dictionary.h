@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 class Dictionary
 {
@@ -12,6 +13,11 @@ private:
 
     static std::string toUpperCase(std::string_view word);
     void loadBasicWords();
+    bool loadFromMultipleSources();
+
+    // Helper functions for better word validation
+    static bool isValidScrabbleWord(std::string_view word);
+    static std::string normalize(std::string_view word);
 
 public:
     Dictionary();
@@ -23,6 +29,9 @@ public:
 
     // Check loaded
     bool isLoaded() const noexcept { return !words.empty(); }
+
+    // Get statistics about loaded dictionary
+    void printStats() const;
 };
 
 #endif
