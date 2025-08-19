@@ -8,7 +8,8 @@
 Game::Game() : window(nullptr), renderer(nullptr), running(false),
                currentPlayer(0), selectedTileIndex(-1), isDragging(false),
                mouseX(0), mouseY(0), placementDirection(0), isPlacingWord(false),
-               hasSetDirection(false), gameState(PLAYER_SELECTION), playerCount(2) {}
+               hasSetDirection(false), gameState(PLAYER_SELECTION), playerCount(2),
+               currentWindowWidth(WINDOW_WIDTH), currentWindowHeight(WINDOW_HEIGHT) {}
 
 Game::~Game()
 {
@@ -33,7 +34,7 @@ bool Game::initialize()
                               SDL_WINDOWPOS_CENTERED,
                               SDL_WINDOWPOS_CENTERED,
                               WINDOW_WIDTH, WINDOW_HEIGHT,
-                              SDL_WINDOW_SHOWN);
+                              SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 
     if (!window)
     {
@@ -87,13 +88,26 @@ int Game::getPlayerCount() const
 
 void Game::dealInitialTiles()
 {
+    bool anyBlankTiles = false;
     for (auto &player : players)
     {
         while (player.hasEmptySlots() && !tileBag.isEmpty())
         {
-            player.addTile(tileBag.drawTile());
+            auto tile = tileBag.drawTile();
+            if (tile && tile->letter == ' ')
+            {
+                anyBlankTiles = true;
+            }
+            player.addTile(std::move(tile));
         }
     }
+
+    addLog("Initial tiles dealt to all players");
+    if (anyBlankTiles)
+    {
+        addLog("Info: '?' tiles are blank tiles (worth 0 points, can represent any letter)");
+    }
+    addLog("Duplicates are normal - Scrabble has multiple copies of common letters");
 }
 
 void Game::run()
@@ -188,6 +202,12 @@ void Game::handleEvents()
             mouseX = event.motion.x;
             mouseY = event.motion.y;
             break;
+        case SDL_WINDOWEVENT:
+            if (event.window.event == SDL_WINDOWEVENT_RESIZED)
+            {
+                handleWindowResize(event.window.data1, event.window.data2);
+            }
+            break;
         }
     }
 }
@@ -281,10 +301,41 @@ void Game::handleMouseRelease(int x, int y)
     isDragging = false;
 }
 
+void Game::handleWindowResize(int width, int height)
+{
+    currentWindowWidth = width;
+    currentWindowHeight = height;
+
+    // Ensure minimum window size to keep the game playable
+    const int minWidth = 800;
+    const int minHeight = 600;
+
+    if (width < minWidth || height < minHeight)
+    {
+        int newWidth = std::max(width, minWidth);
+        int newHeight = std::max(height, minHeight);
+        SDL_SetWindowSize(window, newWidth, newHeight);
+        currentWindowWidth = newWidth;
+        currentWindowHeight = newHeight;
+    }
+
+    // Update window title to show current dimensions
+    std::string title = "Scrabble - " + std::to_string(currentWindowWidth) + "x" + std::to_string(currentWindowHeight);
+    SDL_SetWindowTitle(window, title.c_str());
+
+    // Don't log window resize to avoid spam in game log
+}
+
 void Game::addLog(const std::string &message)
 {
     gameLog.push_back(message);
-    if (gameLog.size() > 10) // Keep log size manageable
+
+    // Calculate maximum log entries based on window height
+    int availableHeight = currentWindowHeight - (BOARD_START_Y + 250); // Reserve space for other UI
+    int lineHeight = 25;                                               // Increased from 20 for better spacing
+    int maxLogEntries = std::max(5, availableHeight / lineHeight);     // At least 5 entries
+
+    if (gameLog.size() > static_cast<size_t>(maxLogEntries))
     {
         gameLog.erase(gameLog.begin());
     }
@@ -650,6 +701,12 @@ void Game::renderGameInfo()
     int infoX = BOARD_START_X + Board::BOARD_SIZE * CELL_SIZE + 50;
     int infoY = BOARD_START_Y;
 
+    // Ensure info panel is visible even in smaller windows
+    if (infoX >= currentWindowWidth - 200)
+    {
+        infoX = currentWindowWidth - 250; // Fallback position
+    }
+
     // Scores
     for (size_t i = 0; i < players.size(); i++)
     {
@@ -672,13 +729,40 @@ void Game::renderGameInfo()
 
 void Game::renderLog()
 {
+    // Position log in the right side of the window with responsive positioning
     int logX = BOARD_START_X + Board::BOARD_SIZE * CELL_SIZE + 50;
     int logY = BOARD_START_Y + 200;
+    int logWidth = currentWindowWidth - logX - 20; // Leave 20px margin from right edge
+
+    // Ensure log area is visible even in smaller windows
+    if (logX >= currentWindowWidth - 200)
+    {
+        logX = currentWindowWidth - 250; // Fallback position
+        logWidth = 230;
+    }
+
+    // Header with better styling
     textRenderer.renderText("Game Log:", logX, logY, {255, 220, 100, 255}); // Gold header
+
+    // Draw a subtle separator line under the header
+    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+    SDL_Rect separatorRect = {logX, logY + 20, logWidth, 1};
+    SDL_RenderFillRect(renderer, &separatorRect);
+
+    // Render log entries with improved spacing
+    int lineHeight = 25;    // Increased spacing between lines
+    int startY = logY + 30; // Start below header and separator
 
     for (size_t i = 0; i < gameLog.size(); ++i)
     {
-        textRenderer.renderText(gameLog[i], logX, logY + (i + 1) * 20, {220, 220, 220, 255}); // Light gray log text
+        int currentY = startY + i * lineHeight;
+
+        // Only render if the line is visible within the window
+        if (currentY + lineHeight <= currentWindowHeight - 20)
+        {
+            // Add subtle bullet points for better readability
+            textRenderer.renderText("• " + gameLog[i], logX, currentY, {220, 220, 220, 255}); // Light gray log text
+        }
     }
 }
 
@@ -760,6 +844,16 @@ bool Game::canAddTileToWord(int row, int col)
 
 void Game::addTileToWord(int row, int col, int tileIndex)
 {
+    // Check if this tile index is already being used in pending placements
+    for (size_t i = 0; i < pendingTileIndices.size(); i++)
+    {
+        if (pendingTileIndices[i] == tileIndex)
+        {
+            addLog("Cannot use the same tile twice in one word");
+            return;
+        }
+    }
+
     pendingPlacements.push_back({row, col});
     pendingTileIndices.push_back(tileIndex);
 
@@ -843,9 +937,29 @@ void Game::commitWord()
     addLog("Total score added: " + std::to_string(totalScore));
 
     // Draw new tiles
+    int tilesDrawn = 0;
+    int blankTilesDrawn = 0;
     while (players[currentPlayer].hasEmptySlots() && !tileBag.isEmpty())
     {
-        players[currentPlayer].addTile(tileBag.drawTile());
+        auto newTile = tileBag.drawTile();
+        if (newTile)
+        {
+            if (newTile->letter == ' ')
+            {
+                blankTilesDrawn++;
+            }
+            players[currentPlayer].addTile(std::move(newTile));
+            tilesDrawn++;
+        }
+    }
+
+    if (tilesDrawn > 0)
+    {
+        addLog("Drew " + std::to_string(tilesDrawn) + " new tile(s)");
+        if (blankTilesDrawn > 0)
+        {
+            addLog("Note: '?' tiles are blank tiles (can be any letter)");
+        }
     }
 
     // End turn
@@ -1255,8 +1369,8 @@ std::string Game::getPremiumSquareText(Board::Premium premium)
 
 void Game::renderPlayerSelection()
 {
-    int centerX = WINDOW_WIDTH / 2;
-    int centerY = WINDOW_HEIGHT / 2;
+    int centerX = currentWindowWidth / 2;
+    int centerY = currentWindowHeight / 2;
 
     // Title
     std::string title = "SCRABBLE";

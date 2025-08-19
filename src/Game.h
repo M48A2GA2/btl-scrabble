@@ -39,6 +39,10 @@ private:
     SDL_Renderer *renderer;
     TextRenderer textRenderer;
 
+    // Window management
+    int currentWindowWidth;
+    int currentWindowHeight;
+
     // Game state
     GameState gameState;
     bool running;
@@ -70,6 +74,7 @@ private:
     void handleEvents();
     void handleMouseClick(int x, int y);
     void handleMouseRelease(int x, int y);
+    void handleWindowResize(int width, int height);
 
     // Game logic
     void update();
