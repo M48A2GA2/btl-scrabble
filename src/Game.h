@@ -67,6 +67,12 @@ private:
     std::vector<std::pair<int, int>> pendingPlacements;
     std::vector<int> pendingTileIndices;
 
+    // Blank tile handling
+    int pendingBlankTileHandIndex;
+
+    // Pass tracking
+    int consecutivePasses;
+
     // Game log
     std::vector<std::string> gameLog;
 
@@ -96,6 +102,11 @@ private:
     std::string getHorizontalWordAt(int row, int col, int tileIndex) const;
     std::string getVerticalWordAt(int row, int col, int tileIndex) const;
     std::string buildWordFromPosition(int row, int col, int deltaRow, int deltaCol, int newTileIndex) const;
+
+    // Positions + scoring helpers
+    struct WordWithPositions { std::string word; std::vector<std::pair<int,int>> positions; bool isMain; };
+    std::vector<WordWithPositions> getFormedWordsWithPositions() const;
+    int scoreWordWithPremiums(const WordWithPositions &wordInfo) const;
 
     // Scoring
     int calculateWordScore(const std::string &word) const;
