@@ -1,124 +1,120 @@
-# Scrabble Game - Bài Tập Lớn OOP
+# Scrabble Game
 
-## Mô Tả
-Đây là game Scrabble được phát triển bằng C++ với thư viện SDL2 cho môn Lập Trình Nâng Cao.
+A fully functional Scrabble game implemented in C++ with SDL2 graphics.
 
-## Tính Năng
-- Giao diện đồ họa với SDL2
-- Board game Scrabble 15x15 với các ô premium
-- Hệ thống chấm điểm chuẩn Scrabble
-- Kiểm tra từ điển tự động
-- 2 người chơi luân phiên
-- Drag & drop để đặt gạch
-- Hiển thị điểm số và thông tin game
+## Features
 
-## Yêu Cầu Hệ Thống
-- C++ Compiler (g++ hoặc Visual Studio)
+- Complete Scrabble board with premium squares (Double/Triple Letter/Word)
+- Two to four player turn-based gameplay
+- Dictionary word validation
+- Drag-and-drop tile placement
+- Score calculation according to official Scrabble rules
+- Visual feedback for valid moves and premium squares
+- Game log to track moves and scores
+
+## Requirements
+
+- C++17 compatible compiler (g++ or clang++)
 - SDL2 library
 - SDL2_ttf library
-- Make (cho Linux/macOS) hoặc Visual Studio (cho Windows)
 
-## Cài Đặt
+## Installation
 
-### Windows (với Visual Studio)
-1. Tải và cài đặt Visual Studio Community
-2. Tải SDL2 development libraries từ https://www.libsdl.org/
-3. Tải SDL2_ttf từ https://www.libsdl.org/projects/SDL_ttf/
-4. Giải nén và copy các file vào thư mục dự án
-5. Cấu hình include paths và library paths trong Visual Studio
-
-### Linux (Ubuntu/Debian)
+### Ubuntu/Debian
 ```bash
-# Cài đặt dependencies
 sudo apt update
 sudo apt install build-essential libsdl2-dev libsdl2-ttf-dev
-
-# Biên dịch
-make
-
-# Chạy game
-./scrabble
 ```
 
-### macOS (với Homebrew)
+### macOS (with Homebrew)
 ```bash
-# Cài đặt dependencies
 brew install sdl2 sdl2_ttf
+```
 
-# Biên dịch
+### Windows
+1. Install Visual Studio Community
+2. Download SDL2 development libraries from https://www.libsdl.org/
+3. Download SDL2_ttf from https://www.libsdl.org/projects/SDL_ttf/
+
+## Building
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd scrabble
+
+# Build the game
 make
 
-# Chạy game
+# Run the game
 ./scrabble
+
+# Build and run tests
+make test
+./test_dict
 ```
 
-## Cấu Trúc Project
+## How to Play
+
+1. **Starting the Game**
+   - Run the executable
+   - Select number of players (2-4) using number keys, then press ENTER
+   - Player 1 goes first
+
+2. **Playing a Turn**
+   - Click and drag tiles from your rack to the board
+   - Tiles must form valid words horizontally or vertically
+   - The first word must touch the center star
+   - Subsequent words must connect to existing tiles
+
+3. **Controls**
+   - **Click + Drag**: Move tiles from rack to board
+   - **ENTER**: Confirm your word placement
+   - **ESC**: Cancel current word placement
+   - **SPACE**: Pass your turn
+
+4. **Scoring**
+   - Each letter has a point value
+   - Premium squares multiply letter or word scores:
+     - **2L**: Double letter score
+     - **3L**: Triple letter score
+     - **2W**: Double word score
+     - **3W**: Triple word score
+   - **Bingo Bonus**: 50 points for using all 7 tiles in one turn
+
+5. **Game End**
+   - Game ends when the tile bag is empty and a player uses all their tiles
+   - Points from remaining tiles in opponents' racks are subtracted from their scores
+   - Player with the highest score wins
+
+## Project Structure
+
 ```
-btl-scrabble-hieu/
-├── src/                 # Mã nguồn C++
-│   ├── main.cpp        # File chính
-│   ├── Game.cpp/.h     # Lớp Game chính
-│   ├── Board.cpp/.h    # Lớp bàn cờ
-│   ├── Player.cpp/.h   # Lớp người chơi
-│   ├── Tile.cpp/.h     # Lớp gạch chữ
-│   ├── TileBag.cpp/.h  # Lớp túi gạch
-│   ├── Dictionary.cpp/.h # Lớp từ điển
-│   └── TextRenderer.cpp/.h # Lớp render text
-├── assets/fonts/       # Font chữ
-├── dictionary.txt      # File từ điển
-├── Makefile           # Build script
-└── README.md          # File này
+scrabble/
+├── src/                    # Source code
+│   ├── Game.cpp/.h        # Main game controller
+│   ├── Board.cpp/.h       # Game board logic
+│   ├── Player.cpp/.h      # Player management
+│   ├── Tile.cpp/.h        # Tile representation
+│   ├── TileBag.cpp/.h     # Tile distribution
+│   ├── Dictionary.cpp/.h  # Word validation
+│   ├── TextRenderer.cpp/.h# Text rendering
+│   └── main.cpp           # Entry point
+├── assets/                # Game assets
+│   ├── dictionaries/      # Word list files
+│   └── fonts/             # Font files
+├── Makefile              # Build configuration
+└── DOCUMENTATION.md      # Technical documentation
 ```
 
-## Cách Chơi
-1. **Bắt đầu**: Player 1 đi trước, phải đặt từ qua ô giữa (★)
-2. **Đặt gạch**: Click và kéo gạch từ tay lên board
-3. **Tạo từ**: Các gạch phải tạo thành từ hợp lệ
-4. **Kết nối**: Từ mới phải kết nối với từ đã có trên board
-5. **Xác nhận**: Nhấn ENTER để xác nhận, ESC để hủy
-6. **Chấm điểm**: Điểm tính theo giá trị gạch và ô premium
+## Technical Documentation
 
-## Điều Khiển
-- **Click + Drag**: Kéo gạch lên board
-- **ENTER**: Xác nhận từ đã đặt
-- **ESC**: Hủy bỏ từ đang đặt
-- **SPACE**: Bỏ lượt (tạm thời)
-
-## Hệ Thống Chấm Điểm
-- Mỗi gạch có điểm riêng (A=1, B=3, C=3, ...)
-- **2L**: Nhân đôi điểm chữ cái
-- **3L**: Nhân ba điểm chữ cái  
-- **2W**: Nhân đôi điểm từ
-- **3W**: Nhân ba điểm từ
-- **Bingo**: +50 điểm khi dùng hết 7 gạch
-
-## Các Lớp Chính
-
-### Game
-- Quản lý vòng lặp game chính
-- Xử lý input và events
-- Render giao diện
-
-### Board
-- Quản lý bàn cờ 15x15
-- Xử lý việc đặt gạch
-- Tính toán từ được tạo
-
-### Player
-- Quản lý thông tin người chơi
-- Quản lý tay gạch (7 gạch)
-- Tính điểm
-
-### TileBag
-- Quản lý túi gạch (100 gạch)
-- Phân phối gạch ngẫu nhiên
-- Theo chuẩn phân phối Scrabble
-
-### Dictionary
-- Kiểm tra tính hợp lệ của từ
-- Tải từ điển từ file
-- Hỗ trợ từ điển cơ bản
+See [DOCUMENTATION.md](DOCUMENTATION.md) for detailed information about:
+- Class implementations
+- Game architecture
+- Build system
+- Game flow and rules
 
 ## License
-Dự án giáo dục - Chỉ dành cho mục đích học tập
 
+This project is for educational purposes only.

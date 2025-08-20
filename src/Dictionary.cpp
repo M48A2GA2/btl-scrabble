@@ -5,14 +5,22 @@
 #include <cctype>
 #include <vector>
 #include <sys/stat.h>
+#include <array>
 
 // Helper function to check if file exists (avoiding std::filesystem for compatibility)
-bool fileExists(const std::string &path)
+namespace
 {
-    struct stat buffer;
-    return (stat(path.c_str(), &buffer) == 0);
-}
+    bool fileExists(const std::string &path)
+    {
+        struct stat buffer;
+        return (stat(path.c_str(), &buffer) == 0);
+    }
+} // anonymous namespace
 
+/**
+ * Default constructor - attempts to load dictionary from file
+ * Falls back to basic word set if file loading fails
+ */
 Dictionary::Dictionary()
 {
     if (!loadFromMultipleSources())
@@ -22,6 +30,11 @@ Dictionary::Dictionary()
     }
 }
 
+/**
+ * Constructor with specific filename
+ *
+ * @param filename The path to the dictionary file
+ */
 Dictionary::Dictionary(const std::string &filename)
 {
     if (!loadFromFile(filename))
@@ -35,6 +48,12 @@ Dictionary::Dictionary(const std::string &filename)
     }
 }
 
+/**
+ * Load words from a file
+ *
+ * @param filename The path to the dictionary file
+ * @return true if successfully loaded, false otherwise
+ */
 bool Dictionary::loadFromFile(const std::string &filename)
 {
     std::ifstream file(filename);
@@ -77,9 +96,13 @@ bool Dictionary::loadFromFile(const std::string &filename)
     return validWords > 0;
 }
 
+/**
+ * Load a basic set of words as fallback
+ * Used when no dictionary file can be loaded
+ */
 void Dictionary::loadBasicWords()
 {
-    constexpr std::string_view basicWords[] = {
+    constexpr std::array<std::string_view, 80> basicWords = {
         "CAT", "DOG", "HOUSE", "TREE", "BOOK", "GAME", "PLAY", "WORD", "TILE",
         "BOARD", "SCORE", "POINT", "LETTER", "PLACE", "MOVE", "TURN", "WIN",
         "LOSE", "DRAW", "HAND", "RACK", "BAG", "BLANK", "TRIPLE", "DOUBLE",
@@ -87,11 +110,11 @@ void Dictionary::loadBasicWords()
         "BIG", "SMALL", "FAST", "SLOW", "HOT", "COLD", "RED", "BLUE", "GREEN",
         "WHITE", "BLACK", "YELLOW", "ORANGE", "PURPLE", "PINK", "BROWN", "GRAY",
         "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN",
-        "GO", "RUN", "WALK", "JUMP", "STOP", "LOOK", "SEE", "HEAR", "TALK", "SAY",
+        "GO", "RUN", "WALK", "JUMP", "LOOK", "SEE", "HEAR", "TALK", "SAY",
         "MAKE", "TAKE", "GIVE", "GET", "PUT", "COME", "WORK", "HELP", "FIND", "KNOW"};
 
     words.clear();
-    words.reserve(std::size(basicWords));
+    words.reserve(basicWords.size());
 
     for (const auto &word : basicWords)
     {
@@ -101,6 +124,12 @@ void Dictionary::loadBasicWords()
     std::cout << "Loaded " << words.size() << " basic words\n";
 }
 
+/**
+ * Check if a word is valid (exists in dictionary)
+ *
+ * @param word The word to check
+ * @return true if word is valid, false otherwise
+ */
 bool Dictionary::isValidWord(std::string_view word) const
 {
     if (word.empty())
@@ -108,10 +137,15 @@ bool Dictionary::isValidWord(std::string_view word) const
     return words.find(normalize(word)) != words.end();
 }
 
+/**
+ * Try to load dictionary from multiple possible sources
+ *
+ * @return true if successfully loaded from any source, false otherwise
+ */
 bool Dictionary::loadFromMultipleSources()
 {
     // Try multiple possible locations for the dictionary file
-    const std::vector<std::string> possiblePaths = {
+    constexpr std::array<std::string_view, 5> possiblePaths = {
         "assets/dictionaries/english_words.txt",
         "./assets/dictionaries/english_words.txt",
         "../assets/dictionaries/english_words.txt",
@@ -122,10 +156,10 @@ bool Dictionary::loadFromMultipleSources()
 
     for (const auto &path : possiblePaths)
     {
-        if (fileExists(path))
+        if (fileExists(std::string(path)))
         {
             std::cout << "Found dictionary at: " << path << "\n";
-            if (loadFromFile(path))
+            if (loadFromFile(std::string(path)))
             {
                 return true;
             }
@@ -141,6 +175,12 @@ bool Dictionary::loadFromMultipleSources()
     return false;
 }
 
+/**
+ * Check if a word is valid according to Scrabble rules
+ *
+ * @param word The word to validate
+ * @return true if word is valid, false otherwise
+ */
 bool Dictionary::isValidScrabbleWord(std::string_view word)
 {
     // Check word length (Scrabble words are typically 2-15 letters)
@@ -157,6 +197,12 @@ bool Dictionary::isValidScrabbleWord(std::string_view word)
     return true;
 }
 
+/**
+ * Normalize a word to uppercase for consistent storage and lookup
+ *
+ * @param word The word to normalize
+ * @return The normalized (uppercase) word
+ */
 std::string Dictionary::normalize(std::string_view word)
 {
     std::string result;
@@ -170,6 +216,10 @@ std::string Dictionary::normalize(std::string_view word)
     return result;
 }
 
+/**
+ * Print statistics about the loaded dictionary
+ * Shows word count and distribution by length
+ */
 void Dictionary::printStats() const
 {
     std::cout << "\n=== Dictionary Statistics ===\n";
@@ -194,10 +244,4 @@ void Dictionary::printStats() const
         }
     }
     std::cout << "=============================\n\n";
-}
-
-std::string Dictionary::toUpperCase(std::string_view word)
-{
-    // This method is now deprecated in favor of normalize()
-    return normalize(word);
 }

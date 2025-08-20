@@ -12,7 +12,7 @@ class Board
 public:
     static const int BOARD_SIZE = 15;
 
-    enum Premium
+    enum class Premium
     {
         NONE,
         DOUBLE_LETTER,
@@ -37,7 +37,7 @@ public:
         std::unique_ptr<Tile> tile;
         Premium premium;
 
-        Square(Premium p = NONE) : premium(p) {}
+        explicit Square(Premium p = Premium::NONE) : premium(p) {}
 
         // Disable copy constructor and assignment
         Square(const Square &) = delete;
@@ -54,28 +54,39 @@ private:
     std::vector<std::vector<Square>> grid;
     bool firstMovePlayed;
 
+    // Helper methods for initializing premium squares
+    void initializeTripleWordSquares();
+    void initializeDoubleWordSquares();
+    void initializeTripleLetterSquares();
+    void initializeDoubleLetterSquares();
+
 public:
     Board();
 
+    // Board initialization
     void initializePremiumSquares();
-    bool isInBounds(int row, int col) const noexcept;
-    Square &getSquare(int row, int col);
-    const Square &getSquare(int row, int col) const;
-    bool placeTile(int row, int col, std::unique_ptr<Tile> tile);
 
-    // Fixed function signature
+    // Board state queries
+    bool isInBounds(int row, int col) const noexcept;
+    const Square &getSquare(int row, int col) const;
+    Square &getSquare(int row, int col);
+    Premium getPremium(int row, int col) const;
+
+    // Tile placement
+    bool placeTile(int row, int col, std::unique_ptr<Tile> tile);
+    bool canPlaceTile(int row, int col) const noexcept;
+
+    // Move validation
+    bool isFirstMovePlayed() const noexcept { return firstMovePlayed; }
+    bool isValidFirstMove(int row, int col) const noexcept;
+    bool isAdjacentToExistingTile(int row, int col) const noexcept;
+    bool isEmpty() const noexcept;
+
+    // Word formation and scoring
     std::vector<WordInfo> getWordsFormedByMove(
         const std::vector<std::pair<int, int>> &positions) const;
     std::string getWordInDirection(int row, int col, int deltaRow, int deltaCol) const;
-    bool isAdjacentToExistingTile(int row, int col) const noexcept;
-    bool isFirstMovePlayed() const noexcept { return firstMovePlayed; }
-    bool isValidFirstMove(int row, int col) const noexcept;
-    bool canPlaceTile(int row, int col) const noexcept;
-
-    // Add missing functions
     int calculateWordScore(const WordInfo &wordInfo) const;
-    Premium getPremium(int row, int col) const;
-    bool isEmpty() const noexcept;
 };
 
 #endif

@@ -1,9 +1,16 @@
 #include "TextRenderer.h"
 #include <iostream>
 #include <vector>
+#include <array>
 
+/**
+ * Default constructor
+ */
 TextRenderer::TextRenderer() : font(nullptr), renderer(nullptr) {}
 
+/**
+ * Destructor - cleans up font and cached textures
+ */
 TextRenderer::~TextRenderer()
 {
     clearCache();
@@ -13,6 +20,14 @@ TextRenderer::~TextRenderer()
     }
 }
 
+/**
+ * Initialize the text renderer with a font
+ * 
+ * @param sdlRenderer The SDL renderer to use
+ * @param fontPath Path to the font file
+ * @param fontSize Size of the font
+ * @return true if initialization successful, false otherwise
+ */
 bool TextRenderer::initialize(SDL_Renderer *sdlRenderer, const std::string &fontPath, int fontSize)
 {
     if (!sdlRenderer)
@@ -24,8 +39,8 @@ bool TextRenderer::initialize(SDL_Renderer *sdlRenderer, const std::string &font
     renderer = sdlRenderer;
 
     // Try multiple font paths with better error handling
-    const std::vector<std::string> fontPaths = {
-        fontPath,
+    constexpr std::array<std::string_view, 6> fontPaths = {
+        "",
         "assets/fonts/DejaVuSans.ttf",
         "./assets/fonts/DejaVuSans.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans.ttf", // Common Linux path
@@ -33,12 +48,25 @@ bool TextRenderer::initialize(SDL_Renderer *sdlRenderer, const std::string &font
         "C:/Windows/Fonts/arial.ttf"              // Windows
     };
 
+    // Try the provided path first
+    font = TTF_OpenFont(fontPath.c_str(), fontSize);
+    if (font)
+    {
+        std::cout << "Successfully loaded font: " << fontPath << '\n';
+        return true;
+    }
+    else
+    {
+        std::cout << "Failed to load font: " << fontPath << " - " << TTF_GetError() << '\n';
+    }
+
+    // Try fallback paths
     for (const auto &path : fontPaths)
     {
         if (path.empty())
             continue;
 
-        font = TTF_OpenFont(path.c_str(), fontSize);
+        font = TTF_OpenFont(std::string(path).c_str(), fontSize);
         if (font)
         {
             std::cout << "Successfully loaded font: " << path << '\n';
@@ -54,6 +82,14 @@ bool TextRenderer::initialize(SDL_Renderer *sdlRenderer, const std::string &font
     return false;
 }
 
+/**
+ * Render text at a specific position
+ * 
+ * @param text The text to render
+ * @param x X coordinate for rendering
+ * @param y Y coordinate for rendering
+ * @param color Color of the text (default: black)
+ */
 void TextRenderer::renderText(const std::string &text, int x, int y, SDL_Color color)
 {
     if (!font || !renderer || text.empty())
@@ -88,6 +124,16 @@ void TextRenderer::renderText(const std::string &text, int x, int y, SDL_Color c
     SDL_DestroyTexture(textTexture);
 }
 
+/**
+ * Render text centered within a rectangle
+ * 
+ * @param text The text to render
+ * @param x X coordinate of the rectangle
+ * @param y Y coordinate of the rectangle
+ * @param width Width of the rectangle
+ * @param height Height of the rectangle
+ * @param color Color of the text (default: black)
+ */
 void TextRenderer::renderCenteredText(const std::string &text, int x, int y, int width, int height, SDL_Color color)
 {
     if (!font || !renderer || text.empty())
@@ -126,6 +172,10 @@ void TextRenderer::renderCenteredText(const std::string &text, int x, int y, int
     SDL_DestroyTexture(textTexture);
 }
 
+/**
+ * Clear all cached text textures
+ * Should be called when font or renderer changes
+ */
 void TextRenderer::clearCache()
 {
     for (auto &[key, texture] : textCache)

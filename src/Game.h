@@ -10,71 +10,99 @@
 #include "TextRenderer.h"
 #include "Dictionary.h"
 
+// Game window dimensions
 const int WINDOW_WIDTH = 1024;
 const int WINDOW_HEIGHT = 768;
+
+// Board rendering constants
 const int CELL_SIZE = 40;
 const int BOARD_START_X = 50;
 const int BOARD_START_Y = 50;
 
-enum GameState
+/**
+ * Game state enumeration
+ */
+enum class GameState
 {
-    PLAYER_SELECTION,
-    PLAYING,
-    GAME_OVER
+    PLAYER_SELECTION,  // Selecting number of players
+    PLAYING,           // Game in progress
+    GAME_OVER          // Game has ended
 };
 
+/**
+ * Main game class that controls the Scrabble game flow
+ */
 class Game
 {
 public:
+    /**
+     * Constructor
+     */
     Game();
+
+    /**
+     * Destructor
+     */
     ~Game();
 
+    /**
+     * Initialize the game components
+     * @return true if initialization successful, false otherwise
+     */
     bool initialize();
+
+    /**
+     * Run the main game loop
+     */
     void run();
+
+    /**
+     * Clean up game resources
+     */
     void cleanup();
 
 private:
     // SDL components
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    TextRenderer textRenderer;
+    SDL_Window *window;           // Main game window
+    SDL_Renderer *renderer;       // Renderer for drawing
+    TextRenderer textRenderer;    // Text rendering helper
 
     // Window management
-    int currentWindowWidth;
-    int currentWindowHeight;
+    int currentWindowWidth;       // Current window width
+    int currentWindowHeight;      // Current window height
 
     // Game state
-    GameState gameState;
-    bool running;
-    int playerCount;
+    GameState gameState;          // Current game state
+    bool running;                 // Whether the game is running
+    int playerCount;              // Number of players (2-4)
 
     // Game components
-    Board board;
-    std::vector<Player> players;
-    TileBag tileBag;
-    Dictionary dictionary;
-    int currentPlayer;
+    Board board;                  // Game board
+    std::vector<Player> players;  // Players in the game
+    TileBag tileBag;              // Bag of tiles
+    Dictionary dictionary;        // Word dictionary
+    int currentPlayer;            // Index of current player
 
     // Mouse and interaction
-    int mouseX, mouseY;
-    bool isDragging;
-    int selectedTileIndex;
+    int mouseX, mouseY;           // Current mouse position
+    bool isDragging;              // Whether a tile is being dragged
+    int selectedTileIndex;        // Index of selected tile in hand
 
     // Word placement
-    bool isPlacingWord;
-    bool hasSetDirection;
-    int placementDirection; // 0 = horizontal, 1 = vertical
-    std::vector<std::pair<int, int>> pendingPlacements;
-    std::vector<int> pendingTileIndices;
+    bool isPlacingWord;                           // Whether player is placing a word
+    bool hasSetDirection;                         // Whether word direction is set
+    int placementDirection;                       // 0 = horizontal, 1 = vertical
+    std::vector<std::pair<int, int>> pendingPlacements;   // Positions of tiles being placed
+    std::vector<int> pendingTileIndices;          // Indices of tiles being placed
 
     // Blank tile handling
-    int pendingBlankTileHandIndex;
+    int pendingBlankTileHandIndex;                // Index of blank tile awaiting letter selection
 
     // Pass tracking
-    int consecutivePasses;
+    int consecutivePasses;                        // Number of consecutive passes
 
     // Game log
-    std::vector<std::string> gameLog;
+    std::vector<std::string> gameLog;             // Log of game events
 
     // Event handling
     void handleEvents();
@@ -104,7 +132,13 @@ private:
     std::string buildWordFromPosition(int row, int col, int deltaRow, int deltaCol, int newTileIndex) const;
 
     // Positions + scoring helpers
-    struct WordWithPositions { std::string word; std::vector<std::pair<int,int>> positions; bool isMain; };
+    struct WordWithPositions 
+    { 
+        std::string word; 
+        std::vector<std::pair<int,int>> positions; 
+        bool isMain; 
+    };
+    
     std::vector<WordWithPositions> getFormedWordsWithPositions() const;
     int scoreWordWithPremiums(const WordWithPositions &wordInfo) const;
 
